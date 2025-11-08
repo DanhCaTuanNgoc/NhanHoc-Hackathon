@@ -161,7 +161,7 @@ export default function Dashboard({ navigation }: DashboardProps) {
             <TouchableOpacity 
               className="px-4 py-2 rounded-lg"
               style={{ backgroundColor: colors.accent }}
-              onPress={() => navigation.navigate('Exercises')}
+              onPress={() => navigation.navigate('UploadDocument')}
             >
               <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
                 Bắt đầu

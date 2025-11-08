@@ -3,9 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from 'react-native';
 import { colors } from '../constants/theme';
+import AdditionalFeatures from '../screens/AdditionalFeatures';
 import Chat from '../screens/Chat';
 import Dashboard from '../screens/Dashboard';
 import Login from '../screens/Login';
+import PdfAnalysisScreen from '../screens/PdfAnalysisScreen';
 import Quiz from '../screens/Quiz';
 import Recommendations from '../screens/Recommendations';
 import RoadmapDetail from '../screens/RoadmapDetail';
@@ -32,8 +34,8 @@ function TabNavigator() {
             iconName = focused ? 'analytics' : 'analytics-outline';
           } else if (route.name === 'Chat') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'Recommendations') {
-            iconName = focused ? 'bulb' : 'bulb-outline';
+          } else if (route.name === 'AdditionalFeatures') {
+            iconName = focused ? 'rocket' : 'rocket-outline';
           } else if (route.name === 'UploadDocument') {
             iconName = focused ? 'book' : 'book-outline';
           }
@@ -68,8 +70,8 @@ function TabNavigator() {
         component={UploadDocument}
       />
       <Tab.Screen 
-        name="Recommendations" 
-        component={Recommendations}
+        name="AdditionalFeatures" 
+        component={AdditionalFeatures}
       />
       <Tab.Screen 
         name="Chat" 
@@ -94,6 +96,8 @@ export default function AppNavigator() {
       <Stack.Screen name="Quiz" component={Quiz} />
       <Stack.Screen name="ViewResource" component={ViewResource} />
       <Stack.Screen name="UploadDocument" component={UploadDocument} />
+      <Stack.Screen name="Recommendations" component={Recommendations} />
+      <Stack.Screen name="PdfAnalysis" component={PdfAnalysisScreen} />
     </Stack.Navigator>
   );
 }

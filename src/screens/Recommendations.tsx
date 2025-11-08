@@ -1,24 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import React, { useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { getPersonalizedRecommendations, RecommendationsData } from '../api/recommendationsApi';
-import AppHeader from '../components/AppHeader';
+import PdfAnalysis from '../components/PdfAnalysis';
 import { colors } from '../constants/theme';
 import { useInitializeStores } from '../hooks/useInitializeStores';
 import { getLearningDataForAnalytics } from '../services/localStorage';
 
 export default function Recommendations() {
-  const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
+  const [loading, setLoading] = useState(false); // Bắt đầu với false
   const [error, setError] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationsData | null>(null);
   const { isInitialized } = useInitializeStores();
   const [isLoadingRef, setIsLoadingRef] = useState(false); // Prevent duplicate calls
+  const [hasStarted, setHasStarted] = useState(false); // Track if user has clicked to start
 
-  useEffect(() => {
-    if (isInitialized && !isLoadingRef) {
-      loadRecommendations();
-    }
-  }, [isInitialized]);
+  // Remove auto-load useEffect - user must click button to start
+  // useEffect(() => {
+  //   if (isInitialized && !isLoadingRef) {
+  //     loadRecommendations();
+  //   }
+  // }, [isInitialized]);
 
   const loadRecommendations = async () => {
     // Prevent duplicate calls
@@ -28,6 +32,7 @@ export default function Recommendations() {
     }
 
     try {
+      setHasStarted(true);
       setIsLoadingRef(true);
       setLoading(true);
       setError(null);
@@ -123,18 +128,173 @@ export default function Recommendations() {
     }
   };
 
-  // Hiển thị loading
-  if (!isInitialized || loading) {
+  // Hiển thị initial state - chưa bắt đầu
+  if (!isInitialized) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-        <AppHeader title="Gợi ý học tập" />
+        {/* Back Button */}
+        <View className="flex-row items-center px-6 py-4" style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: '#F8FAFC' }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
+            Gợi ý học tập
+          </Text>
+        </View>
         <View className="flex-1 items-center justify-center px-6">
           <ActivityIndicator size="large" color={colors.primary} />
           <Text className="mt-4 text-base text-center" style={{ color: '#64748b' }}>
+            Đang khởi tạo...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Hiển thị màn hình ban đầu - chưa nhấn button
+  if (!hasStarted && !loading && !recommendations) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
+        {/* Back Button */}
+        <View className="flex-row items-center px-6 py-4" style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: '#F8FAFC' }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
+            Gợi ý học tập AI
+          </Text>
+        </View>
+        <ScrollView className="flex-1">
+          <View className="items-center justify-center px-6 pt-8">
+            <View 
+              className="w-24 h-24 rounded-full items-center justify-center mb-6"
+              style={{ backgroundColor: colors.primary + '15' }}
+            >
+              <Ionicons name="sparkles" size={48} color={colors.primary} />
+            </View>
+            
+            <Text className="text-2xl font-bold mb-3 text-center" style={{ color: '#0f172a' }}>
+              Gợi ý học tập AI
+            </Text>
+            
+            <Text className="text-base text-center mb-2" style={{ color: '#64748b' }}>
+              AI sẽ phân tích dữ liệu học tập của bạn và đưa ra:
+            </Text>
+
+            <View className="w-full mt-4 mb-6">
+              <View className="flex-row items-center mb-3">
+                <View 
+                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                  style={{ backgroundColor: colors.primary + '15' }}
+                >
+                  <Ionicons name="trending-up" size={20} color={colors.primary} />
+                </View>
+                <Text className="text-sm flex-1" style={{ color: '#475569' }}>
+                  Chủ đề tiếp theo phù hợp với trình độ
+                </Text>
+              </View>
+
+              <View className="flex-row items-center mb-3">
+                <View 
+                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                  style={{ backgroundColor: colors.accent + '15' }}
+                >
+                  <Ionicons name="map" size={20} color={colors.accent} />
+                </View>
+                <Text className="text-sm flex-1" style={{ color: '#475569' }}>
+                  Lộ trình học tập chi tiết
+                </Text>
+              </View>
+
+              <View className="flex-row items-center mb-3">
+                <View 
+                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                  style={{ backgroundColor: colors.success + '15' }}
+                >
+                  <Ionicons name="bar-chart" size={20} color={colors.success} />
+                </View>
+                <Text className="text-sm flex-1" style={{ color: '#475569' }}>
+                  Điều chỉnh độ khó phù hợp
+                </Text>
+              </View>
+
+              <View className="flex-row items-center">
+                <View 
+                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                  style={{ backgroundColor: '#F59E0B' + '15' }}
+                >
+                  <Ionicons name="bulb" size={20} color="#F59E0B" />
+                </View>
+                <Text className="text-sm flex-1" style={{ color: '#475569' }}>
+                  Lời khuyên và tips học tập
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={loadRecommendations}
+              className="w-full py-4 rounded-xl items-center flex-row justify-center"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <Ionicons name="sparkles" size={24} color="#FFFFFF" />
+              <Text className="text-white font-bold text-lg ml-2">
+                Nhận gợi ý từ AI
+              </Text>
+            </TouchableOpacity>
+
+            <Text className="text-xs text-center mt-4" style={{ color: '#94a3b8' }}>
+              Dựa trên dữ liệu học tập và kết quả quiz của bạn
+            </Text>
+          </View>
+
+          {/* Divider */}
+          <View className="px-6 pt-8">
+            <View
+              className="h-px"
+              style={{ backgroundColor: '#E2E8F0' }}
+            />
+          </View>
+
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Hiển thị loading khi đang xử lý
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
+        {/* Back Button */}
+        <View className="flex-row items-center px-6 py-4" style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: '#F8FAFC' }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
+            Gợi ý học tập
+          </Text>
+        </View>
+        <View className="flex-1 items-center justify-center px-6">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="mt-4 text-base text-center font-semibold" style={{ color: '#0f172a' }}>
             AI đang phân tích dữ liệu của bạn...
           </Text>
-          <Text className="mt-2 text-sm text-center" style={{ color: '#94a3b8' }}>
+          <Text className="mt-2 text-sm text-center" style={{ color: '#64748b' }}>
             Vui lòng đợi trong giây lát
+          </Text>
+          <Text className="mt-1 text-xs text-center" style={{ color: '#94a3b8' }}>
+            Quá trình này có thể mất 20-30 giây
           </Text>
         </View>
       </SafeAreaView>
@@ -145,7 +305,19 @@ export default function Recommendations() {
   if (error) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-        <AppHeader title="Gợi ý học tập" />
+        {/* Back Button */}
+        <View className="flex-row items-center px-6 py-4" style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: '#F8FAFC' }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
+            Gợi ý học tập
+          </Text>
+        </View>
         <View className="flex-1 items-center justify-center px-6">
           <Ionicons name="alert-circle" size={80} color="#EF4444" />
           <Text className="text-xl font-bold mt-4" style={{ color: '#0f172a' }}>
@@ -175,7 +347,19 @@ export default function Recommendations() {
   )) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-        <AppHeader title="Gợi ý học tập" />
+        {/* Back Button */}
+        <View className="flex-row items-center px-6 py-4" style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: '#F8FAFC' }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
+            Gợi ý học tập
+          </Text>
+        </View>
         <View className="flex-1 items-center justify-center px-6">
           <Ionicons name="school" size={80} color={colors.primary} />
           <Text className="text-xl font-bold mt-4" style={{ color: '#0f172a' }}>
@@ -198,7 +382,19 @@ export default function Recommendations() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Gợi ý học tập" />
+      {/* Back Button */}
+      <View className="flex-row items-center px-6 py-4" style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+          style={{ backgroundColor: '#F8FAFC' }}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
+          Gợi ý học tập
+        </Text>
+      </View>
       
       <ScrollView className="flex-1">
         {/* Performance Summary */}
@@ -601,8 +797,27 @@ export default function Recommendations() {
           </View>
         )}
 
+        {/* Divider */}
+        <View className="px-6 pt-6">
+          <View
+            className="h-px"
+            style={{ backgroundColor: '#E2E8F0' }}
+          />
+        </View>
+
+        {/* PDF Analysis Section */}
+        <PdfAnalysis />
+
+        {/* Divider */}
+        <View className="px-6">
+          <View
+            className="h-px"
+            style={{ backgroundColor: '#E2E8F0' }}
+          />
+        </View>
+
         {/* Refresh Button */}
-        <View className="px-6 pb-8">
+        <View className="px-6 pt-6 pb-8">
           <TouchableOpacity
             onPress={loadRecommendations}
             className="py-4 rounded-xl items-center flex-row justify-center"
