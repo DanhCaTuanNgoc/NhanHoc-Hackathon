@@ -1,11 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
 import React, { useState } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
-import { DrawerParamList } from '../types';
 
 interface UploadButtonProps {
-  navigation: DrawerNavigationProp<DrawerParamList>;
+  navigation: any;
   onPress?: () => void;
 }
 

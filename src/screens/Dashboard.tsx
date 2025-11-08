@@ -1,45 +1,262 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppHeader from '../components/AppHeader';
-import DashboardHeader from '../components/DashboardHeader';
-import LessonCard from '../components/LessonCard';
-import StatCard from '../components/StatCard';
+import ActionButton from '../components/ActionButton';
+import CircularProgress from '../components/CircularProgress';
 import UploadButton from '../components/UploadButton';
 import { colors } from '../constants/theme';
 import { DrawerParamList } from '../types';
 
-type DashboardScreenNavigationProp = DrawerNavigationProp<DrawerParamList, 'Dashboard'>;
+type DashboardScreenNavigationProp = BottomTabNavigationProp<DrawerParamList, 'Dashboard'>;
 
 interface DashboardProps {
   navigation: DashboardScreenNavigationProp;
 }
 
 export default function Dashboard({ navigation }: DashboardProps) {
-  return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Trang chủ" />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className="px-6 pt-4 pb-6">
-          <DashboardHeader userName="Học viên" />
+  // Get current date info
+  const now = new Date();
+  const dayNumber = now.getDate();
+  const dayName = now.toLocaleDateString('vi-VN', { weekday: 'long' });
+  const monthYear = now.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
 
-          {/* Stats Cards */}
-          <View className="flex-row gap-3 mb-4">
-            <StatCard value="12" label="Bài học" color={colors.primary} />
-            <StatCard value="8" label="Hoàn thành" color={colors.accent} />
-            <StatCard value="85%" label="Điểm TB" color={colors.success} />
+  // Week status data (M-F)
+  const weekStatus = [
+    { day: 'M', completed: true, color: colors.primary },
+    { day: 'T', completed: true, color: colors.accent },
+    { day: 'W', completed: true, color: colors.primary },
+    { day: 'Th', completed: false, color: '#E2E8F0' },
+    { day: 'Fr', completed: false, color: '#E2E8F0' },
+  ];
+
+  return (
+    <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {/* Blue Gradient Header with Border Radius */}
+        <LinearGradient
+          colors={[colors.primary, colors.secondary, colors.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            paddingHorizontal: 24,
+            paddingTop: 20,
+            paddingBottom: 40,
+            borderBottomLeftRadius: 40,
+            borderBottomRightRadius: 40,
+          }}
+        >
+          {/* Top Icons */}
+          <View className="flex-row justify-between items-center mb-6">
+            <Text 
+              className="text-4xl font-bold" 
+              style={{ 
+                color: '#FFFFFF', 
+                fontStyle: 'italic',
+                letterSpacing: 2,
+                textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                textShadowOffset: { width: 2, height: 2 },
+                textShadowRadius: 4,
+                fontWeight: '900',
+              }}
+            >
+              Nhàn Học
+            </Text>
+            <View className="flex-row gap-4">
+              <TouchableOpacity onPress={() => navigation.navigate('UploadDocument')}>
+                <Ionicons name="send" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity>
+                <Ionicons name="notifications" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+                <Ionicons name="person-circle" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Quick Action Card */}
+          <View className="bg-white rounded-2xl p-4 flex-row items-center justify-between">
+            <View className="flex-row items-center flex-1">
+              <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: '#E0F2FE' }}>
+                <Ionicons name="calendar" size={20} color={colors.primary} />
+              </View>
+              <Text className="text-sm font-semibold ml-3" style={{ color: '#1E293B' }}>
+                Bài học hôm nay
+              </Text>
+            </View>
+            <TouchableOpacity 
+              className="px-4 py-2 rounded-lg"
+              style={{ backgroundColor: colors.accent }}
+              onPress={() => navigation.navigate('Exercises')}
+            >
+              <Text className="text-sm font-bold" style={{ color: '#FFFFFF' }}>
+                Bắt đầu
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        {/* Date Card */}
+        <View className="mx-6 -mt-6 mb-6">
+          <View 
+            className="rounded-2xl p-5"
+            style={{ 
+              backgroundColor: '#FFFFFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 12,
+              elevation: 5,
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center">
+                <Text className="text-5xl font-bold mr-2" style={{ color: colors.primary }}>
+                  {dayNumber}
+                </Text>
+                <View>
+                  <Text className="text-xs font-semibold" style={{ color: '#64748B' }}>
+                    {dayName}
+                  </Text>
+                  <Text className="text-xs" style={{ color: '#94A3B8' }}>
+                    {monthYear}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
+            </View>
+
+            {/* This week status */}
+            <Text className="text-xs font-semibold mb-2" style={{ color: '#64748B' }}>
+              Trạng thái tuần này
+            </Text>
+            <View className="flex-row justify-between">
+              {weekStatus.map((item, index) => (
+                <View key={index} className="items-center">
+                  <Text className="text-xs mb-2" style={{ color: '#64748B' }}>
+                    {item.day}
+                  </Text>
+                  <View
+                    className="w-8 h-8 rounded-full items-center justify-center"
+                    style={{ backgroundColor: item.color }}
+                  >
+                    {item.completed && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Circular Stats */}
+        <View className="px-6 mb-6">
+          <View 
+            className="rounded-2xl p-5 flex-row justify-around"
+            style={{ 
+              backgroundColor: '#FFFFFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 3,
+            }}
+          >
+            <CircularProgress
+              percentage={83}
+              value="83%"
+              label="Điểm danh"
+              color={colors.primary}
+              size={90}
+            />
+            <CircularProgress
+              percentage={3}
+              value="03"
+              label="Nghỉ phép"
+              color={colors.accent}
+              size={90}
+            />
+            <CircularProgress
+              percentage={23}
+              value="23"
+              label="Ngày học"
+              color={colors.secondary}
+              size={90}
+            />
+          </View>
+        </View>
+
+        {/* Action Buttons Grid */}
+        <View className="px-6 mb-6">
+          <View 
+            className="rounded-2xl p-5"
+            style={{ 
+              backgroundColor: '#FFFFFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 3,
+            }}
+          >
+            {/* Row 1 */}
+            <View className="flex-row mb-6">
+              <ActionButton
+                icon={<Ionicons name="calendar" size={28} color={colors.primary} />}
+                label="Xin nghỉ"
+                backgroundColor="#E0F2FE"
+                onPress={() => {}}
+              />
+              <ActionButton
+                icon={<Ionicons name="trophy" size={28} color={colors.accent} />}
+                label="Bảng xếp hạng"
+                backgroundColor="#CFFAFE"
+                onPress={() => navigation.navigate('Statistics')}
+              />
+              <ActionButton
+                icon={<Ionicons name="newspaper" size={28} color={colors.secondary} />}
+                label="Tin tức"
+                badge={true}
+                backgroundColor="#DBEAFE"
+                onPress={() => {}}
+              />
+            </View>
+
+            {/* Row 2 */}
+            <View className="flex-row">
+              <ActionButton
+                icon={<Ionicons name="bar-chart" size={28} color={colors.primary} />}
+                label="Dự đoán"
+                backgroundColor="#E0F2FE"
+                onPress={() => navigation.navigate('Statistics')}
+              />
+              <ActionButton
+                icon={<Ionicons name="people" size={28} color={colors.accent} />}
+                label="Bạn bè"
+                backgroundColor="#CFFAFE"
+                onPress={() => {}}
+              />
+              <ActionButton
+                icon={<Ionicons name="create" size={28} color={colors.secondary} />}
+                label="Bài tập"
+                badge={true}
+                backgroundColor="#DBEAFE"
+                onPress={() => navigation.navigate('Exercises')}
+              />
+            </View>
           </View>
         </View>
 
         {/* Upload Section */}
-        <View className="px-6 mb-8">
+        <View className="px-6 mb-6">
           <UploadButton navigation={navigation} />
         </View>
 
-        {/* Course Summary */}
+        {/* Course Summary - Keeping original functionality */}
         <View className="px-6 mb-8">
           <View className="flex-row items-center mb-4">
             <MaterialCommunityIcons name="book-open-page-variant" size={24} color={colors.primary} />
@@ -81,111 +298,6 @@ export default function Dashboard({ navigation }: DashboardProps) {
                 <Text className="text-xs" style={{ color: '#64748b' }}>Học tập</Text>
               </View>
             </View>
-          </View>
-        </View>
-
-        {/* Weekly Statistics */}
-        <View className="px-6 mb-8">
-          <View className="flex-row items-center mb-4">
-            <Ionicons name="bar-chart" size={24} color={colors.accent} />
-            <Text className="text-xl font-bold ml-2" style={{ color: '#0f172a' }}>
-              Thống kê tuần này
-            </Text>
-          </View>
-          
-          <View className="flex-row gap-3">
-            <View className="flex-1 rounded-xl p-4" style={{ backgroundColor: '#FEF3C7' }}>
-              <View className="flex-row items-center justify-between mb-2">
-                <Ionicons name="time-outline" size={20} color="#D97706" />
-                <Text className="text-xs font-semibold" style={{ color: '#D97706' }}>+12%</Text>
-              </View>
-              <Text className="text-2xl font-bold mb-1" style={{ color: '#78350F' }}>8.5h</Text>
-              <Text className="text-xs" style={{ color: '#92400E' }}>Thời gian học</Text>
-            </View>
-            
-            <View className="flex-1 rounded-xl p-4" style={{ backgroundColor: '#DBEAFE' }}>
-              <View className="flex-row items-center justify-between mb-2">
-                <Ionicons name="checkmark-circle-outline" size={20} color="#2563EB" />
-                <Text className="text-xs font-semibold" style={{ color: '#2563EB' }}>+8</Text>
-              </View>
-              <Text className="text-2xl font-bold mb-1" style={{ color: '#1E3A8A' }}>23</Text>
-              <Text className="text-xs" style={{ color: '#1E40AF' }}>Bài hoàn thành</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Performance Overview */}
-        <View className="px-6 mb-8">
-          <View className="flex-row items-center mb-4">
-            <MaterialCommunityIcons name="chart-line" size={24} color={colors.success} />
-            <Text className="text-xl font-bold ml-2" style={{ color: '#0f172a' }}>
-              Hiệu suất học tập
-            </Text>
-          </View>
-          
-          <View className="rounded-2xl p-5" style={{ backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0' }}>
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-sm font-semibold" style={{ color: '#15803D' }}>Điểm trung bình</Text>
-              <View className="flex-row items-center">
-                <Ionicons name="trending-up" size={16} color={colors.success} />
-                <Text className="text-sm font-bold ml-1" style={{ color: colors.success }}>85%</Text>
-              </View>
-            </View>
-            
-            <View className="mb-3">
-              <View className="h-2 rounded-full" style={{ backgroundColor: '#DCFCE7' }}>
-                <View className="h-2 rounded-full" style={{ backgroundColor: colors.success, width: '85%' }} />
-              </View>
-            </View>
-            
-            <View className="flex-row justify-between">
-              <View>
-                <Text className="text-xs" style={{ color: '#16A34A' }}>Điểm cao nhất: 98%</Text>
-              </View>
-              <View>
-                <Text className="text-xs" style={{ color: '#16A34A' }}>Điểm thấp nhất: 72%</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Recent Lessons */}
-        <View className="px-6 pb-6">
-          <View className="flex-row items-center mb-4">
-            <Ionicons name="book" size={24} color="#8B5CF6" />
-            <Text className="text-xl font-bold ml-2" style={{ color: '#0f172a' }}>
-              Bài học gần đây
-            </Text>
-          </View>
-          
-          <View className="space-y-3">
-            <LessonCard
-              icon={<MaterialCommunityIcons name="calculator" size={24} color="#FFFFFF" />}
-              title="Toán học lớp 10"
-              subtitle="Chương 3: Hàm số bậc nhất"
-              status="completed"
-              statusColor={colors.success}
-              statusLabel="Hoàn thành"
-              backgroundColor={colors.primary}
-            />
-            <LessonCard
-              icon={<Ionicons name="flask-outline" size={24} color="#FFFFFF" />}
-              title="Hóa học cơ bản"
-              subtitle="Bài 5: Phản ứng hóa học"
-              status="in-progress"
-              statusColor={colors.accent}
-              statusLabel="Đang học"
-              backgroundColor={colors.secondary}
-            />
-            <LessonCard
-              icon={<Ionicons name="earth-outline" size={24} color="#0f172a" />}
-              title="Địa lý thế giới"
-              subtitle="Chương 1: Các châu lục"
-              status="not-started"
-              statusColor="#64748b"
-              statusLabel="Chưa học"
-              backgroundColor={colors.warning}
-            />
           </View>
         </View>
       </ScrollView>

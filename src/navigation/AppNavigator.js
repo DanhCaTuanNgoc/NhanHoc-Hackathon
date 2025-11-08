@@ -1,36 +1,75 @@
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { Ionicons } from '@expo/vector-icons';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import CustomDrawerContent from '../components/CustomDrawerContent';
+import { colors } from '../constants/theme';
 import Dashboard from '../screens/Dashboard';
 import Exercises from '../screens/Exercises';
 import Login from '../screens/Login';
 import Profile from '../screens/Profile';
-import Settings from '../screens/Settings';
 import Statistics from '../screens/Statistics';
 import UploadDocument from '../screens/UploadDocument';
 
 const Stack = createNativeStackNavigator();
-const Drawer = createDrawerNavigator();
+const Tab = createBottomTabNavigator();
 
-function DrawerNavigator() {
+function TabNavigator() {
   return (
-    <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
         headerShown: false,
-        drawerType: 'front',
-        drawerStyle: {
-          width: 280,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          let iconSize = size;
+
+          if (route.name === 'Dashboard') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Statistics') {
+            iconName = focused ? 'time' : 'time-outline';
+          } else if (route.name === 'UploadDocument') {
+            iconName = focused ? 'add-circle' : 'add-circle-outline';
+            iconSize = 30; // Slightly larger size for center button
+          } else if (route.name === 'Exercises') {
+            iconName = focused ? 'calendar' : 'calendar-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'layers' : 'layers-outline';
+          }
+
+          return <Ionicons name={iconName} size={iconSize} color={color} />;
         },
-      }}
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E2E8F0',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+      })}
     >
-      <Drawer.Screen name="Dashboard" component={Dashboard} />
-      <Drawer.Screen name="UploadDocument" component={UploadDocument} />
-      <Drawer.Screen name="Exercises" component={Exercises} />
-      <Drawer.Screen name="Statistics" component={Statistics} />
-      <Drawer.Screen name="Settings" component={Settings} />
-      <Drawer.Screen name="Profile" component={Profile} />
-    </Drawer.Navigator>
+      <Tab.Screen 
+        name="Dashboard" 
+        component={Dashboard}
+      />
+      <Tab.Screen 
+        name="Statistics" 
+        component={Statistics}
+      />
+      <Tab.Screen 
+        name="UploadDocument" 
+        component={UploadDocument}
+      />
+      <Tab.Screen 
+        name="Exercises" 
+        component={Exercises}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={Profile}
+      />
+    </Tab.Navigator>
   );
 }
 
@@ -43,7 +82,7 @@ export default function AppNavigator() {
       }}
     >
       <Stack.Screen name="Login" component={Login} />
-      <Stack.Screen name="Main" component={DrawerNavigator} />
+      <Stack.Screen name="Main" component={TabNavigator} />
     </Stack.Navigator>
   );
 }

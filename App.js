@@ -23,7 +23,7 @@ export default function App() {
     <GestureHandlerRootView className="flex-1 bg-slate-950">
       <SafeAreaProvider>
         <NavigationContainer theme={navigationTheme}>
-          <StatusBar style="light" />
+          <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
           <AppNavigator />
         </NavigationContainer>
       </SafeAreaProvider>

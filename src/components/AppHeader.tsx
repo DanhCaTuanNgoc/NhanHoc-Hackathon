@@ -1,8 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { colors } from '../constants/theme';
 
 interface AppHeaderProps {
@@ -27,7 +26,7 @@ export default function AppHeader({ title = 'Nhàn Học', showMenuButton = true
         elevation: 3,
       }}
     >
-      {showMenuButton && (
+      {/* {showMenuButton && (
         <TouchableOpacity 
           className="w-10 h-10 rounded-xl items-center justify-center"
           style={{ backgroundColor: '#F8FAFC' }}
@@ -35,10 +34,10 @@ export default function AppHeader({ title = 'Nhàn Học', showMenuButton = true
         >
           <Feather name="menu" size={24} color={colors.primary} />
         </TouchableOpacity>
-      )}
+      )} */}
       
       <Text 
-        className="text-xl font-bold flex-1 ml-3"
+        className="text-xl font-bold flex-1 ml-0"
         style={{ color: colors.primary }}
       >
         {title}
