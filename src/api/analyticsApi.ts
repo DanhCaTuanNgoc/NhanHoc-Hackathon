@@ -3,6 +3,7 @@
  * Xử lý các request liên quan đến phân tích học tập
  */
 
+import { getAllCourses, getAllQuizResults } from '../services/localStorage';
 import { JobCreateResponse } from '../types/api';
 import apiClient from './apiClient';
 
@@ -21,17 +22,24 @@ export interface LearningData {
 }
 
 export interface LearningActivity {
+  id?: number;
+  activityType: string;
   date: string; // ISO date
   topic: string;
+  subtopic?: string;
   duration: number; // seconds
-  type: 'quiz' | 'resource' | 'chat';
+  timestamp: number;
+  type?: 'quiz' | 'resource' | 'chat';
 }
 
 export interface QuizAnalyticsResult {
   topic: string;
+  subtopic: string;
   score: number; // 0-100
   correct_answers: number;
   total_questions: number;
+  time_spent: number;
+  timestamp: number;
   passed: boolean;
   date: string; // ISO date
 }
@@ -182,6 +190,86 @@ const pollInsightsStatus = async (
   }
 
   throw new Error('Max polling attempts reached');
+};
+
+/**
+ * Lấy dữ liệu học tập từ AsyncStorage
+ * Convert từ format của app sang format cho API
+ */
+export const getLearningData = async (): Promise<LearningData> => {
+  try {
+    console.log('📊 Getting learning data from AsyncStorage...');
+    
+    // Lấy courses và quiz results từ localStorage
+    const [courses, quizResults] = await Promise.all([
+      getAllCourses(),
+      getAllQuizResults()
+    ]);
+
+    // Convert quiz results sang format phù hợp
+    const quiz_results: QuizAnalyticsResult[] = quizResults.map(result => ({
+      topic: result.courseTopic,
+      subtopic: result.subtopic,
+      score: result.score,
+      correct_answers: result.userAnswers.filter((answer, idx) => 
+        answer === result.questions[idx]?.answerIndex
+      ).length,
+      total_questions: result.totalQuestions,
+      time_spent: result.totalQuestions * 60, // Estimate 1 min per question
+      timestamp: new Date(result.completedAt).getTime(),
+      passed: result.score >= 70,
+      date: result.completedAt
+    }));
+
+    // Tạo learning activities từ quiz history
+    const learning_activities: LearningActivity[] = quizResults.map((result, index) => ({
+      id: index,
+      activityType: 'quiz_taken',
+      date: result.completedAt,
+      topic: result.courseTopic,
+      subtopic: result.subtopic,
+      duration: result.totalQuestions * 60, // Estimate 1 min per question
+      timestamp: new Date(result.completedAt).getTime(),
+      type: 'quiz' as const
+    }));
+
+    // Tính time spent theo topic
+    const time_spent: Record<string, number> = {};
+    courses.forEach(course => {
+      const courseQuizzes = quizResults.filter(q => q.courseId === course.id);
+      const totalTime = courseQuizzes.reduce((sum, q) => sum + (q.totalQuestions * 60), 0);
+      if (totalTime > 0) {
+        time_spent[course.topic] = totalTime;
+      }
+    });
+
+    // Lấy danh sách topics
+    const current_topics = Array.from(new Set(courses.map(c => c.topic)));
+
+    const learningData: LearningData = {
+      learning_activities,
+      quiz_results,
+      time_spent,
+      current_topics
+    };
+
+    console.log('✅ Learning data prepared:', {
+      activities: learningData.learning_activities.length,
+      quizzes: learningData.quiz_results.length,
+      topics: learningData.current_topics.length
+    });
+
+    return learningData;
+  } catch (error) {
+    console.error('❌ Error getting learning data:', error);
+    // Return empty data if error
+    return {
+      learning_activities: [],
+      quiz_results: [],
+      time_spent: {},
+      current_topics: []
+    };
+  }
 };
 
 /**

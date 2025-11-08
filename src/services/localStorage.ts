@@ -646,18 +646,25 @@ export const getLearningDataForAnalytics = async () => {
     // Chuyển đổi quiz results sang format analytics
     const quiz_results = quizResults.map(result => ({
       topic: result.courseTopic,
+      subtopic: result.subtopic,
       score: result.score,
       correct_answers: Math.round((result.score / 100) * result.totalQuestions),
       total_questions: result.totalQuestions,
+      time_spent: result.totalQuestions * 60, // seconds
+      timestamp: new Date(result.completedAt).getTime(),
       passed: result.score >= 70,
       date: result.completedAt,
     }));
 
     // Tạo learning activities từ quiz results
-    const learning_activities = quizResults.map(result => ({
+    const learning_activities = quizResults.map((result, index) => ({
+      id: index,
+      activityType: 'quiz_taken',
       date: result.completedAt,
       topic: result.courseTopic,
+      subtopic: result.subtopic,
       duration: result.totalQuestions * 60, // Giả sử mỗi câu hỏi mất 1 phút
+      timestamp: new Date(result.completedAt).getTime(),
       type: 'quiz' as const,
     }));
 

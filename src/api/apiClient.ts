@@ -42,7 +42,8 @@ class ApiClient {
    */
   private logError(message: string, error?: any) {
     if (__DEV__ && ENABLE_API_LOGS) {
-      console.error(message, error);
+      // console.error(message, error);
+      console.log(message, error); // Use console.log instead to avoid red errors in UI
     }
   }
 

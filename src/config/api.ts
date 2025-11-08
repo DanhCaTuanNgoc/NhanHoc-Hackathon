@@ -39,8 +39,18 @@ export const API_ENDPOINTS = {
   ANALYTICS: {
     OVERVIEW: '/api/analytics/overview',
     INSIGHTS: '/api/analytics/insights',
+    INSIGHTS_STATUS: (jobId: string) => `/api/analytics/insights/status/${jobId}`,
     TOPIC: (topicName: string) => `/api/analytics/topic/${topicName}`,
     STUDY_PLAN: '/api/analytics/study-plan',
+  },
+  
+  // Recommendations endpoints
+  RECOMMENDATIONS: {
+    CREATE: '/api/recommendations/personalized',
+    STATUS: (jobId: string) => `/api/recommendations/personalized/status/${jobId}`,
+    NEXT_TOPICS: '/api/recommendations/next-topics',
+    LEARNING_PATH: '/api/recommendations/learning-path',
+    DIFFICULTY: '/api/recommendations/difficulty',
   },
   
   // Legacy endpoints (deprecated - sẽ được loại bỏ sau)

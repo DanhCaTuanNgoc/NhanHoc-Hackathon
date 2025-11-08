@@ -5,9 +5,9 @@ import { Platform } from 'react-native';
 import { colors } from '../constants/theme';
 import Chat from '../screens/Chat';
 import Dashboard from '../screens/Dashboard';
-import Exercises from '../screens/Exercises';
 import Login from '../screens/Login';
 import Quiz from '../screens/Quiz';
+import Recommendations from '../screens/Recommendations';
 import RoadmapDetail from '../screens/RoadmapDetail';
 import Settings from '../screens/Settings';
 import Statistics from '../screens/Statistics';
@@ -32,8 +32,8 @@ function TabNavigator() {
             iconName = focused ? 'analytics' : 'analytics-outline';
           } else if (route.name === 'Chat') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'Exercises') {
-            iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Recommendations') {
+            iconName = focused ? 'bulb' : 'bulb-outline';
           } else if (route.name === 'UploadDocument') {
             iconName = focused ? 'book' : 'book-outline';
           }
@@ -68,8 +68,8 @@ function TabNavigator() {
         component={UploadDocument}
       />
       <Tab.Screen 
-        name="Exercises" 
-        component={Exercises}
+        name="Recommendations" 
+        component={Recommendations}
       />
       <Tab.Screen 
         name="Chat" 
