@@ -5,8 +5,8 @@ import React from 'react';
 import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import ActionButton from '../components/ActionButton';
 import CircularProgress from '../components/CircularProgress';
-import UploadButton from '../components/UploadButton';
 import { colors } from '../constants/theme';
+import { useCourseStore, useQuizStore } from '../stores';
 import { DrawerParamList } from '../types';
 
 type DashboardScreenNavigationProp = BottomTabNavigationProp<DrawerParamList, 'Dashboard'>;
@@ -16,20 +16,92 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ navigation }: DashboardProps) {
+  // 🔥 Load data từ Zustand stores
+  const courses = useCourseStore((state) => state.courses);
+  const quizResults = useQuizStore((state) => state.quizResults);
+
+  // Calculate statistics
+  const activeCourses = courses.filter(c => c.status === 'active');
+  const completedCourses = courses.filter(c => c.status === 'completed');
+  const totalSubTopics = courses.reduce((sum, c) => sum + c.totalSubTopics, 0);
+  const completedSubTopics = courses.reduce((sum, c) => sum + c.completedSubTopics.length, 0);
+  const overallProgress = totalSubTopics > 0 ? Math.round((completedSubTopics / totalSubTopics) * 100) : 0;
+  
+  // Calculate study time (giả sử mỗi câu quiz = 1 phút)
+  const totalMinutes = quizResults.reduce((sum, r) => sum + r.totalQuestions, 0);
+  const totalHours = Math.round(totalMinutes / 60);
+  
+  // Calculate average score
+  const averageScore = quizResults.length > 0
+    ? Math.round(quizResults.reduce((sum, r) => sum + r.score, 0) / quizResults.length)
+    : 0;
+
+  // Calculate streak
+  const calculateStreak = () => {
+    if (quizResults.length === 0) return 0;
+    
+    const uniqueDates = Array.from(new Set(
+      quizResults.map(r => new Date(r.completedAt).toISOString().split('T')[0])
+    )).sort().reverse();
+    
+    if (uniqueDates.length === 0) return 0;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    
+    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+      return 0;
+    }
+    
+    let streak = 1;
+    for (let i = 0; i < uniqueDates.length - 1; i++) {
+      const date1 = new Date(uniqueDates[i]);
+      const date2 = new Date(uniqueDates[i + 1]);
+      const diffDays = Math.floor((date1.getTime() - date2.getTime()) / (1000 * 3600 * 24));
+      
+      if (diffDays === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  };
+
+  const streak = calculateStreak();
+
   // Get current date info
   const now = new Date();
   const dayNumber = now.getDate();
   const dayName = now.toLocaleDateString('vi-VN', { weekday: 'long' });
   const monthYear = now.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
 
-  // Week status data (M-F)
-  const weekStatus = [
-    { day: 'M', completed: true, color: colors.primary },
-    { day: 'T', completed: true, color: colors.accent },
-    { day: 'W', completed: true, color: colors.primary },
-    { day: 'Th', completed: false, color: '#E2E8F0' },
-    { day: 'Fr', completed: false, color: '#E2E8F0' },
-  ];
+  // Week status data - Calculate based on actual quiz results
+  const getWeekStatus = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const weekDays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const colors_map = [colors.primary, colors.accent, colors.secondary, colors.primary, colors.accent];
+    
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - (dayOfWeek - i));
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const hasQuiz = quizResults.some(r => 
+        new Date(r.completedAt).toISOString().split('T')[0] === dateStr
+      );
+      
+      return {
+        day: weekDays[i],
+        completed: hasQuiz,
+        color: hasQuiz ? colors_map[i % colors_map.length] : '#E2E8F0',
+      };
+    });
+  };
+
+  const weekStatus = getWeekStatus();
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
@@ -83,7 +155,7 @@ export default function Dashboard({ navigation }: DashboardProps) {
                 <Ionicons name="calendar" size={20} color={colors.primary} />
               </View>
               <Text className="text-sm font-semibold ml-3" style={{ color: '#1E293B' }}>
-                Bài học hôm nay
+                Khoá học hôm nay
               </Text>
             </View>
             <TouchableOpacity 
@@ -166,23 +238,23 @@ export default function Dashboard({ navigation }: DashboardProps) {
             }}
           >
             <CircularProgress
-              percentage={83}
-              value="83%"
-              label="Điểm danh"
+              percentage={overallProgress}
+              value={`${overallProgress}%`}
+              label="Tiến độ"
               color={colors.primary}
               size={90}
             />
             <CircularProgress
-              percentage={3}
-              value="03"
-              label="Nghỉ phép"
+              percentage={streak > 0 ? Math.min(streak * 10, 100) : 0}
+              value={`${streak}`}
+              label="Chuỗi ngày"
               color={colors.accent}
               size={90}
             />
             <CircularProgress
-              percentage={23}
-              value="23"
-              label="Ngày học"
+              percentage={averageScore}
+              value={`${averageScore}%`}
+              label="Điểm TB"
               color={colors.secondary}
               size={90}
             />
@@ -191,7 +263,7 @@ export default function Dashboard({ navigation }: DashboardProps) {
 
         {/* Action Buttons Grid */}
         <View className="px-6 mb-6">
-          <View 
+          <View
             className="rounded-2xl p-5"
             style={{ 
               backgroundColor: '#FFFFFF',
@@ -205,57 +277,86 @@ export default function Dashboard({ navigation }: DashboardProps) {
             {/* Row 1 */}
             <View className="flex-row mb-6">
               <ActionButton
-                icon={<Ionicons name="calendar" size={28} color={colors.primary} />}
-                label="Xin nghỉ"
+                icon={<Ionicons name="book" size={28} color={colors.primary} />}
+                label="Khóa học"
                 backgroundColor="#E0F2FE"
-                onPress={() => {}}
+                onPress={() => navigation.navigate('Exercises')}
               />
               <ActionButton
-                icon={<Ionicons name="trophy" size={28} color={colors.accent} />}
-                label="Bảng xếp hạng"
+                icon={<Ionicons name="stats-chart" size={28} color={colors.accent} />}
+                label="Thống kê"
                 backgroundColor="#CFFAFE"
                 onPress={() => navigation.navigate('Statistics')}
               />
               <ActionButton
-                icon={<Ionicons name="newspaper" size={28} color={colors.secondary} />}
-                label="Tin tức"
-                badge={true}
+                icon={<Ionicons name="document-text" size={28} color={colors.secondary} />}
+                label="Tài liệu"
                 backgroundColor="#DBEAFE"
-                onPress={() => {}}
+                onPress={() => navigation.navigate('UploadDocument')}
               />
             </View>
 
             {/* Row 2 */}
             <View className="flex-row">
               <ActionButton
-                icon={<Ionicons name="bar-chart" size={28} color={colors.primary} />}
-                label="Dự đoán"
+                icon={<Ionicons name="school" size={28} color={colors.primary} />}
+                label="Học tập"
                 backgroundColor="#E0F2FE"
+                onPress={() => navigation.navigate('Exercises')}
+              />
+              <ActionButton
+                icon={<Ionicons name="trophy" size={28} color={colors.accent} />}
+                label="Thành tích"
+                badge={quizResults.length > 0}
+                backgroundColor="#CFFAFE"
                 onPress={() => navigation.navigate('Statistics')}
               />
               <ActionButton
-                icon={<Ionicons name="people" size={28} color={colors.accent} />}
-                label="Bạn bè"
-                backgroundColor="#CFFAFE"
-                onPress={() => {}}
-              />
-              <ActionButton
-                icon={<Ionicons name="create" size={28} color={colors.secondary} />}
-                label="Bài tập"
-                badge={true}
+                icon={<Ionicons name="chatbubble-ellipses-outline" size={28} color={colors.secondary} />}
+                label="Chatbot"
                 backgroundColor="#DBEAFE"
-                onPress={() => navigation.navigate('Exercises')}
+                onPress={() => navigation.navigate('Profile')}
               />
             </View>
           </View>
         </View>
 
-        {/* Upload Section */}
+        {/* Create Course Button */}
         <View className="px-6 mb-6">
-          <UploadButton navigation={navigation} />
+          <TouchableOpacity
+            className="rounded-2xl p-6 flex-row items-center justify-between"
+            style={{
+              backgroundColor: colors.primary,
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 12,
+              elevation: 6,
+            }}
+            onPress={() => navigation.navigate('UploadDocument')}
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-center flex-1">
+              <View
+                className="w-14 h-14 rounded-xl items-center justify-center mr-4"
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+              >
+                <Ionicons name="add-circle" size={32} color="#FFFFFF" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-lg font-bold mb-1" style={{ color: '#FFFFFF' }}>
+                  Tạo khóa học mới
+                </Text>
+                <Text className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                  AI sẽ tạo lộ trình học tập cho bạn
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="sparkles" size={28} color="#FCD34D" />
+          </TouchableOpacity>
         </View>
 
-        {/* Course Summary - Keeping original functionality */}
+        {/* Course Summary - Using real data */}
         <View className="px-6 mb-8">
           <View className="flex-row items-center mb-4">
             <MaterialCommunityIcons name="book-open-page-variant" size={24} color={colors.primary} />
@@ -271,12 +372,12 @@ export default function Dashboard({ navigation }: DashboardProps) {
                   <MaterialCommunityIcons name="school" size={24} color="#FFFFFF" />
                 </View>
                 <View className="ml-3">
-                  <Text className="text-2xl font-bold" style={{ color: '#0f172a' }}>5</Text>
+                  <Text className="text-2xl font-bold" style={{ color: '#0f172a' }}>{activeCourses.length}</Text>
                   <Text className="text-sm" style={{ color: '#64748b' }}>Khóa học đang học</Text>
                 </View>
               </View>
               <View className="items-end">
-                <Text className="text-lg font-semibold" style={{ color: colors.accent }}>62%</Text>
+                <Text className="text-lg font-semibold" style={{ color: colors.accent }}>{overallProgress}%</Text>
                 <Text className="text-xs" style={{ color: '#64748b' }}>Hoàn thành</Text>
               </View>
             </View>
@@ -285,15 +386,15 @@ export default function Dashboard({ navigation }: DashboardProps) {
             
             <View className="flex-row justify-between">
               <View className="items-center flex-1">
-                <Text className="text-xl font-bold" style={{ color: colors.secondary }}>32</Text>
-                <Text className="text-xs" style={{ color: '#64748b' }}>Bài giảng</Text>
+                <Text className="text-xl font-bold" style={{ color: colors.secondary }}>{totalSubTopics}</Text>
+                <Text className="text-xs" style={{ color: '#64748b' }}>Chủ đề</Text>
               </View>
               <View className="items-center flex-1">
-                <Text className="text-xl font-bold" style={{ color: colors.accent }}>156</Text>
-                <Text className="text-xs" style={{ color: '#64748b' }}>Bài tập</Text>
+                <Text className="text-xl font-bold" style={{ color: colors.accent }}>{quizResults.length}</Text>
+                <Text className="text-xs" style={{ color: '#64748b' }}>Bài quiz</Text>
               </View>
               <View className="items-center flex-1">
-                <Text className="text-xl font-bold" style={{ color: colors.success }}>24h</Text>
+                <Text className="text-xl font-bold" style={{ color: colors.success }}>{totalHours}h</Text>
                 <Text className="text-xs" style={{ color: '#64748b' }}>Học tập</Text>
               </View>
             </View>

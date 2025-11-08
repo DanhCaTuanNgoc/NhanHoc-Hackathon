@@ -35,7 +35,7 @@ function TabNavigator() {
           } else if (route.name === 'Exercises') {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'UploadDocument') {
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
+            iconName = focused ? 'book' : 'book-outline';
           }
 
           return <Ionicons name={iconName} size={iconSize} color={color} />;
