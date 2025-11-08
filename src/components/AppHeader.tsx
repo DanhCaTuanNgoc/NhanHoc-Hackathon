@@ -37,7 +37,7 @@ export default function AppHeader({ title = 'Nhàn Học', showMenuButton = true
       )} */}
       
       <Text 
-        className="text-xl font-bold flex-1 ml-0"
+        className="text-2xl font-bold flex-1 ml-0"
         style={{ color: colors.primary }}
       >
         {title}

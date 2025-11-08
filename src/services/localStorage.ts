@@ -10,6 +10,7 @@ import type { RoadmapResult } from '../types/api';
 const STORAGE_KEYS = {
   COURSES: '@courses',
   QUIZ_RESULTS: '@quiz_results',
+  CHAT_CONVERSATIONS: '@chat_conversations',
 } as const;
 
 // Types
@@ -20,6 +21,7 @@ export interface Course {
   description: string;
   createdAt: string;
   roadmap: RoadmapResult;
+  resource?: string; // Tài liệu học tập (Markdown content)
   totalSubTopics: number;
   completedSubTopics: string[]; // Array of completed subtopic IDs
   progress: number;
@@ -27,6 +29,8 @@ export interface Course {
   color: string;
   status: 'active' | 'completed';
   quizQuestionsPerLesson?: number; // Số câu hỏi mỗi bài quiz (mặc định 10)
+  knowledgeLevel?: string; // Trình độ kiến thức
+  studyTime?: string; // Thời gian học dự kiến
 }
 
 export interface QuizResult {
@@ -47,6 +51,21 @@ export interface QuizQuestion {
   options: string[];
   answerIndex: number;
   reason: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
 }
 
 // Color palette for courses
@@ -106,7 +125,10 @@ export const createCourse = async (
   topic: string,
   description: string,
   roadmap: RoadmapResult,
-  quizQuestionsPerLesson: number = 10
+  quizQuestionsPerLesson: number = 10,
+  resource?: string,
+  knowledgeLevel?: string,
+  studyTime?: string
 ): Promise<Course> => {
   try {
     const courses = await getAllCourses();
@@ -125,6 +147,7 @@ export const createCourse = async (
       description,
       createdAt: new Date().toISOString(),
       roadmap,
+      resource,
       totalSubTopics,
       completedSubTopics: [],
       progress: 0,
@@ -132,6 +155,8 @@ export const createCourse = async (
       color: COURSE_COLORS[courses.length % COURSE_COLORS.length],
       status: 'active',
       quizQuestionsPerLesson,
+      knowledgeLevel,
+      studyTime,
     };
 
     courses.push(newCourse);
@@ -193,6 +218,33 @@ export const markSubTopicCompleted = async (
 };
 
 /**
+ * Cập nhật tài liệu học tập cho khoá học
+ */
+export const updateCourseResource = async (
+  courseId: string,
+  resource: string
+): Promise<Course | null> => {
+  try {
+    const courses = await getAllCourses();
+    const courseIndex = courses.findIndex(c => c.id === courseId);
+    
+    if (courseIndex === -1) {
+      console.error('Course not found');
+      return null;
+    }
+
+    courses[courseIndex].resource = resource;
+    await AsyncStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(courses));
+    
+    console.log('✅ Course resource updated:', courseId);
+    return courses[courseIndex];
+  } catch (error) {
+    console.error('Error updating course resource:', error);
+    return null;
+  }
+};
+
+/**
  * Kiểm tra xem một subtopic đã hoàn thành chưa
  */
 export const isSubTopicCompleted = async (
@@ -224,13 +276,24 @@ export const saveQuizResult = async (
   userAnswers: (number | null)[]
 ): Promise<QuizResult> => {
   try {
+    console.log('💾 [saveQuizResult] Bắt đầu lưu...');
+    console.log('📊 CourseId:', courseId);
+    console.log('📚 Topic:', courseTopic);
+    console.log('📖 Week:', weekTitle);
+    console.log('📝 Subtopic:', subtopic);
+    console.log('❓ Questions:', questions.length);
+    console.log('✍️ User answers:', userAnswers);
+
     const quizResults = await getAllQuizResults();
+    console.log('📋 Existing quiz results:', quizResults.length);
     
     // Tính điểm
     const correctAnswers = questions.filter(
       (q, index) => userAnswers[index] === q.answerIndex
     ).length;
     const score = Math.round((correctAnswers / questions.length) * 100);
+
+    console.log('💯 Calculated score:', score, '% (', correctAnswers, '/', questions.length, ')');
 
     const newResult: QuizResult = {
       id: `quiz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -246,12 +309,18 @@ export const saveQuizResult = async (
     };
 
     quizResults.push(newResult);
+    
+    console.log('💾 Saving to AsyncStorage...');
     await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_RESULTS, JSON.stringify(quizResults));
     
-    console.log('✅ Quiz result saved:', newResult.id, `Score: ${score}%`);
+    console.log('✅ Quiz result saved successfully!');
+    console.log('🆔 Result ID:', newResult.id);
+    console.log('💯 Score:', score, '%');
+    console.log('📊 Total quiz results now:', quizResults.length);
+    
     return newResult;
   } catch (error) {
-    console.error('Error saving quiz result:', error);
+    console.error('❌ Error saving quiz result:', error);
     throw error;
   }
 };
@@ -373,10 +442,249 @@ export const getStatistics = async () => {
  */
 export const clearAllData = async (): Promise<void> => {
   try {
-    await AsyncStorage.multiRemove([STORAGE_KEYS.COURSES, STORAGE_KEYS.QUIZ_RESULTS]);
+    await AsyncStorage.multiRemove([STORAGE_KEYS.COURSES, STORAGE_KEYS.QUIZ_RESULTS, STORAGE_KEYS.CHAT_CONVERSATIONS]);
     console.log('✅ All data cleared');
   } catch (error) {
     console.error('Error clearing data:', error);
     throw error;
+  }
+};
+
+// ============= Chat Conversation Functions =============
+
+/**
+ * Lấy tất cả chat conversations
+ */
+export const getAllChatConversations = async (): Promise<ChatConversation[]> => {
+  try {
+    const data = await AsyncStorage.getItem(STORAGE_KEYS.CHAT_CONVERSATIONS);
+    if (!data) return [];
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error getting chat conversations:', error);
+    return [];
+  }
+};
+
+/**
+ * Tạo conversation mới
+ */
+export const createChatConversation = async (title: string = 'Chat mới'): Promise<ChatConversation> => {
+  try {
+    const conversations = await getAllChatConversations();
+    
+    const newConversation: ChatConversation = {
+      id: `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    conversations.unshift(newConversation); // Add to beginning
+    await AsyncStorage.setItem(STORAGE_KEYS.CHAT_CONVERSATIONS, JSON.stringify(conversations));
+    
+    console.log('✅ Chat conversation created:', newConversation.id);
+    return newConversation;
+  } catch (error) {
+    console.error('Error creating chat conversation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Lấy một conversation theo ID
+ */
+export const getChatConversationById = async (id: string): Promise<ChatConversation | null> => {
+  try {
+    const conversations = await getAllChatConversations();
+    return conversations.find(conv => conv.id === id) || null;
+  } catch (error) {
+    console.error('Error getting chat conversation by id:', error);
+    return null;
+  }
+};
+
+/**
+ * Thêm message vào conversation
+ */
+export const addMessageToConversation = async (
+  conversationId: string,
+  role: 'user' | 'assistant',
+  content: string
+): Promise<ChatConversation | null> => {
+  try {
+    const conversations = await getAllChatConversations();
+    const conversationIndex = conversations.findIndex(conv => conv.id === conversationId);
+    
+    if (conversationIndex === -1) {
+      console.error('Conversation not found:', conversationId);
+      return null;
+    }
+
+    const newMessage: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      role,
+      content,
+      timestamp: new Date().toISOString(),
+    };
+
+    conversations[conversationIndex].messages.push(newMessage);
+    conversations[conversationIndex].updatedAt = new Date().toISOString();
+
+    // Auto-generate title from first user message
+    if (conversations[conversationIndex].messages.length === 1 && role === 'user') {
+      const titlePreview = content.length > 30 ? content.substring(0, 30) + '...' : content;
+      conversations[conversationIndex].title = titlePreview;
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEYS.CHAT_CONVERSATIONS, JSON.stringify(conversations));
+    
+    console.log('✅ Message added to conversation:', conversationId);
+    return conversations[conversationIndex];
+  } catch (error) {
+    console.error('Error adding message to conversation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Xoá một conversation
+ */
+export const deleteChatConversation = async (id: string): Promise<boolean> => {
+  try {
+    const conversations = await getAllChatConversations();
+    const filteredConversations = conversations.filter(conv => conv.id !== id);
+    
+    await AsyncStorage.setItem(STORAGE_KEYS.CHAT_CONVERSATIONS, JSON.stringify(filteredConversations));
+    
+    console.log('✅ Chat conversation deleted:', id);
+    return true;
+  } catch (error) {
+    console.error('Error deleting chat conversation:', error);
+    return false;
+  }
+};
+
+/**
+ * Lấy user context data để gửi cho AI
+ * Tối ưu hóa: chỉ gửi summary thay vì toàn bộ chi tiết roadmap
+ */
+export const getUserContextData = async () => {
+  try {
+    const courses = await getAllCourses();
+    const quizResults = await getAllQuizResults();
+
+    // Build roadmaps summary (chỉ gửi tên khóa học và số tuần, không gửi chi tiết)
+    const roadmaps: Record<string, any> = {};
+    courses.forEach(course => {
+      const weekKeys = Object.keys(course.roadmap || {}).filter(key => key.startsWith('tuần'));
+      roadmaps[course.topic] = {
+        totalWeeks: weekKeys.length,
+        weeks: weekKeys,
+        // Chỉ gửi title của mỗi tuần, không gửi chi tiết các chủ đề con
+        weekTitles: weekKeys.reduce((acc, week) => {
+          const weekData = course.roadmap[week];
+          acc[week] = weekData?.['chủ đề'] || 'Unknown';
+          return acc;
+        }, {} as Record<string, string>),
+      };
+    });
+
+    // Build quiz stats (giữ nguyên - đã tối ưu rồi)
+    const quizStats: Record<string, any> = {};
+    quizResults.forEach(result => {
+      if (!quizStats[result.courseTopic]) {
+        quizStats[result.courseTopic] = {};
+      }
+      if (!quizStats[result.courseTopic][result.weekTitle]) {
+        quizStats[result.courseTopic][result.weekTitle] = {};
+      }
+      quizStats[result.courseTopic][result.weekTitle][result.subtopic] = {
+        numQues: result.totalQuestions,
+        numCorrect: Math.round((result.score / 100) * result.totalQuestions),
+      };
+    });
+
+    // Count resources
+    const resourceCount = courses.filter(c => c.resource).length;
+
+    // Thêm thông tin về courses
+    const courseSummary = courses.map(c => ({
+      topic: c.topic,
+      progress: c.progress,
+      status: c.status,
+      completedSubTopics: c.completedSubTopics.length,
+      totalSubTopics: c.totalSubTopics,
+    }));
+
+    return {
+      roadmaps, // Summary only - không có chi tiết các chủ đề con
+      quizStats, // Kết quả quiz
+      resourceCount, // Số tài nguyên
+      courses: courseSummary, // Thông tin tóm tắt khóa học
+    };
+  } catch (error) {
+    console.error('Error getting user context data:', error);
+    return {
+      roadmaps: {},
+      quizStats: {},
+      resourceCount: 0,
+      courses: [],
+    };
+  }
+};
+
+/**
+ * Tạo LearningData để gửi lên Analytics API
+ */
+export const getLearningDataForAnalytics = async () => {
+  try {
+    const courses = await getAllCourses();
+    const quizResults = await getAllQuizResults();
+
+    // Chuyển đổi quiz results sang format analytics
+    const quiz_results = quizResults.map(result => ({
+      topic: result.courseTopic,
+      score: result.score,
+      correct_answers: Math.round((result.score / 100) * result.totalQuestions),
+      total_questions: result.totalQuestions,
+      passed: result.score >= 70,
+      date: result.completedAt,
+    }));
+
+    // Tạo learning activities từ quiz results
+    const learning_activities = quizResults.map(result => ({
+      date: result.completedAt,
+      topic: result.courseTopic,
+      duration: result.totalQuestions * 60, // Giả sử mỗi câu hỏi mất 1 phút
+      type: 'quiz' as const,
+    }));
+
+    // Tính thời gian học cho mỗi topic (từ quiz)
+    const time_spent: Record<string, number> = {};
+    quizResults.forEach(result => {
+      const topic = result.courseTopic;
+      const duration = result.totalQuestions * 60; // seconds
+      time_spent[topic] = (time_spent[topic] || 0) + duration;
+    });
+
+    // Danh sách các topic đang học
+    const current_topics = courses.map(c => c.topic);
+
+    return {
+      learning_activities,
+      quiz_results,
+      time_spent,
+      current_topics,
+    };
+  } catch (error) {
+    console.error('Error getting learning data for analytics:', error);
+    return {
+      learning_activities: [],
+      quiz_results: [],
+      time_spent: {},
+      current_topics: [],
+    };
   }
 };

@@ -85,6 +85,31 @@ export interface ResourceJobStatus extends BaseJobResponse {
   result?: string; // Markdown content
 }
 
+// ============= Chat API Types =============
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface UserContextData {
+  roadmaps?: Record<string, RoadmapResult>;
+  quizStats?: Record<string, any>;
+  resourceCount?: number;
+}
+
+export interface ChatJobResponse {
+  job_id: string;
+  status: 'pending';
+  message: string;
+}
+
+export interface ChatJobStatus extends BaseJobResponse {
+  result?: string; // AI response text
+  messages?: ChatMessage[];
+  user_data?: UserContextData;
+}
+
 // ============= API Error Types =============
 
 export interface ApiError {

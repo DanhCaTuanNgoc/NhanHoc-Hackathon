@@ -37,23 +37,43 @@ interface QuizScreenProps {
       subtopic: string;
       description: string;
       numQuestions?: number; // Số câu hỏi trong quiz
+      existingQuizResult?: any; // Kết quả quiz có sẵn (để xem lại)
     };
   };
   navigation: any;
 }
 
 export default function Quiz({ route, navigation }: QuizScreenProps) {
-  const { courseId, course, topic, weekKey, subtopic, description, numQuestions = 10 } = route.params;
+  const { 
+    courseId, 
+    course, 
+    topic, 
+    weekKey, 
+    subtopic, 
+    description, 
+    numQuestions = 10,
+    existingQuizResult 
+  } = route.params;
   const { createAndWait } = useQuiz();
 
   const [questions, setQuestions] = useState<QuizQuestionData[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(!existingQuizResult); // Không generate nếu có kết quả sẵn
 
   useEffect(() => {
-    generateQuiz();
+    if (existingQuizResult) {
+      // Load kết quả có sẵn
+      console.log('📊 Loading existing quiz result:', existingQuizResult);
+      setQuestions(existingQuizResult.questions);
+      setSelectedAnswers(existingQuizResult.userAnswers);
+      setShowResults(true);
+      setIsGenerating(false);
+    } else {
+      // Generate quiz mới
+      generateQuiz();
+    }
   }, []);
 
   const generateQuiz = async () => {
@@ -136,6 +156,14 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
 
   const saveAndShowResults = async () => {
     try {
+      console.log('💾 Bắt đầu lưu kết quả quiz...');
+      console.log('📊 Course ID:', courseId);
+      console.log('📚 Course:', course);
+      console.log('📖 Topic:', topic);
+      console.log('📝 Subtopic:', subtopic);
+      console.log('❓ Total questions:', questions.length);
+      console.log('✍️ Selected answers:', selectedAnswers);
+
       // Lưu kết quả quiz vào database
       const quizQuestions = questions.map(q => ({
         question: q.question,
@@ -144,7 +172,9 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
         reason: q.reason,
       }));
 
-      await localStorage.saveQuizResult(
+      console.log('📝 Quiz questions prepared:', quizQuestions.length);
+
+      const savedResult = await localStorage.saveQuizResult(
         courseId,
         course,
         topic,
@@ -153,13 +183,17 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
         selectedAnswers
       );
 
+      console.log('✅ Quiz result saved:', savedResult);
+      console.log('💯 Score:', savedResult.score, '%');
+
       // Mark subtopic as completed
       await localStorage.markSubTopicCompleted(courseId, weekKey, subtopic);
+      console.log('✅ Subtopic marked as completed');
 
       setShowResults(true);
-      console.log('✅ Quiz result saved successfully');
+      console.log('✅ Quiz result saved successfully - Total:', savedResult.totalQuestions, 'Score:', savedResult.score);
     } catch (error) {
-      console.error('Error saving quiz result:', error);
+      console.error('❌ Error saving quiz result:', error);
       Alert.alert('Lỗi', 'Không thể lưu kết quả. Vui lòng thử lại.');
     }
   };
@@ -184,6 +218,20 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
         <AppHeader title="Đang tạo Quiz..." />
+        
+        {/* Back Button */}
+        <View className="px-6 pt-4 pb-2">
+          <TouchableOpacity
+            className="flex-row items-center"
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.primary} />
+            <Text className="text-sm font-medium ml-2" style={{ color: colors.primary }}>
+              Quay lại
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View className="flex-1 items-center justify-center px-6">
           <View
             className="w-20 h-20 rounded-full items-center justify-center mb-6"
@@ -206,6 +254,20 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
         <AppHeader title="Quiz" />
+        
+        {/* Back Button */}
+        <View className="px-6 pt-4 pb-2">
+          <TouchableOpacity
+            className="flex-row items-center"
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.primary} />
+            <Text className="text-sm font-medium ml-2" style={{ color: colors.primary }}>
+              Quay lại
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View className="flex-1 items-center justify-center px-6">
           <Ionicons name="alert-circle" size={64} color="#EF4444" />
           <Text className="text-lg font-bold text-center mt-4 mb-2" style={{ color: '#0F172A' }}>
@@ -233,9 +295,23 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
         <AppHeader title="Kết Quả" />
+        
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          {/* Back Button */}
+          <View className="px-6 pt-4 pb-2">
+            <TouchableOpacity
+              className="flex-row items-center"
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.primary} />
+              <Text className="text-sm font-medium ml-2" style={{ color: colors.primary }}>
+                Quay lại
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Results Card */}
-          <View className="px-6 pt-6 pb-4">
+          <View className="px-6 pt-2 pb-4">
             <View
               className="rounded-2xl p-6 items-center"
               style={{
@@ -441,8 +517,30 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
       <AppHeader title={`Câu ${currentQuestionIndex + 1}/${questions.length}`} />
 
+      {/* Back Button */}
+      <View className="px-6 pt-4 pb-2">
+        <TouchableOpacity
+          className="flex-row items-center"
+          onPress={() => {
+            Alert.alert(
+              'Thoát quiz?',
+              'Bạn có chắc chắn muốn thoát? Tiến trình của bạn sẽ không được lưu.',
+              [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Thoát', style: 'destructive', onPress: () => navigation.goBack() },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.primary} />
+          <Text className="text-sm font-medium ml-2" style={{ color: colors.primary }}>
+            Quay lại
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Progress Bar */}
-      <View className="px-6 pt-4">
+      <View className="px-6 pt-2">
         <View className="flex-row justify-between items-center mb-2">
           <Text className="text-xs font-semibold" style={{ color: '#64748B' }}>
             Tiến độ

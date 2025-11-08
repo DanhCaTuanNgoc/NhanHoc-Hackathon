@@ -29,6 +29,20 @@ export const API_ENDPOINTS = {
     STATUS: (jobId: string) => `/api/generate-resource/status/${jobId}`,
   },
   
+  // Chat endpoints
+  CHAT: {
+    CREATE: '/api/chat',
+    STATUS: (jobId: string) => `/api/chat/status/${jobId}`,
+  },
+  
+  // Analytics endpoints
+  ANALYTICS: {
+    OVERVIEW: '/api/analytics/overview',
+    INSIGHTS: '/api/analytics/insights',
+    TOPIC: (topicName: string) => `/api/analytics/topic/${topicName}`,
+    STUDY_PLAN: '/api/analytics/study-plan',
+  },
+  
   // Legacy endpoints (deprecated - sẽ được loại bỏ sau)
   COURSES: '/api/courses',
   COURSE_DETAIL: (id: string) => `/api/courses/${id}`,

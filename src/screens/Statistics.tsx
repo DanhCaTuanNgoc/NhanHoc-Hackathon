@@ -1,38 +1,167 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { AIInsights, getAnalyticsInsights } from '../api/analyticsApi';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
+import { getAllCourses, getAllQuizResults, getLearningDataForAnalytics } from '../services/localStorage';
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function Statistics() {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('week');
+  const [loading, setLoading] = useState(true);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState<AIInsights | null>(null);
+  
+  // Real data from localStorage
+  const [totalHours, setTotalHours] = useState(0);
+  const [totalExercises, setTotalExercises] = useState(0);
+  const [avgScore, setAvgScore] = useState(0);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [studyData, setStudyData] = useState<any>({ week: [] });
+  const [streak, setStreak] = useState(0);
 
-  const studyData = {
-    week: [
-      { day: 'T2', hours: 2.5, exercises: 5 },
-      { day: 'T3', hours: 3.2, exercises: 7 },
-      { day: 'T4', hours: 1.8, exercises: 3 },
-      { day: 'T5', hours: 4.1, exercises: 9 },
-      { day: 'T6', hours: 2.9, exercises: 6 },
-      { day: 'T7', hours: 5.5, exercises: 12 },
-      { day: 'CN', hours: 4.2, exercises: 8 },
-    ],
+  useEffect(() => {
+    loadStatistics();
+  }, []);
+
+  const loadStatistics = async () => {
+    try {
+      setLoading(true);
+      const courses = await getAllCourses();
+      const quizResults = await getAllQuizResults();
+
+      // Tính tổng thời gian học (từ quiz - giả sử mỗi câu hỏi mất 1 phút)
+      const totalTimeMinutes = quizResults.reduce((sum, result) => {
+        return sum + result.totalQuestions;
+      }, 0);
+      setTotalHours(totalTimeMinutes / 60);
+
+      // Tổng số bài tập (quiz)
+      setTotalExercises(quizResults.length);
+
+      // Điểm trung bình
+      if (quizResults.length > 0) {
+        const avgScoreCalc = quizResults.reduce((sum, result) => sum + result.score, 0) / quizResults.length;
+        setAvgScore(Math.round(avgScoreCalc));
+      }
+
+      // Subjects progress (từ courses)
+      const subjectsData = courses.map(course => ({
+        name: course.topic,
+        progress: course.progress,
+        color: course.color,
+        icon: course.icon,
+      }));
+      setSubjects(subjectsData);
+
+      // Study data per week (từ quiz results trong 7 ngày gần nhất)
+      const weekData = calculateWeekData(quizResults);
+      setStudyData({ week: weekData });
+
+      // Calculate streak
+      const streakDays = calculateStreak(quizResults);
+      setStreak(streakDays);
+
+    } catch (error) {
+      console.error('Error loading statistics:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const maxHours = Math.max(...studyData.week.map(d => d.hours));
-  const totalHours = studyData.week.reduce((sum, d) => sum + d.hours, 0);
-  const totalExercises = studyData.week.reduce((sum, d) => sum + d.exercises, 0);
-  const avgScore = 87;
+  const calculateWeekData = (quizResults: any[]) => {
+    const today = new Date();
+    const last7Days = [];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      last7Days.push(date);
+    }
 
-  const subjects = [
-    { name: 'Python', progress: 85, color: colors.primary, icon: 'logo-python' },
-    { name: 'JavaScript', progress: 72, color: colors.warning, icon: 'logo-javascript' },
-    { name: 'React', progress: 90, color: colors.accent, icon: 'logo-react' },
-    { name: 'Machine Learning', progress: 65, color: colors.secondary, icon: 'hardware-chip' },
-  ];
+    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    
+    return last7Days.map(date => {
+      const dateStr = date.toISOString().split('T')[0];
+      const dayQuizzes = quizResults.filter(result => {
+        const resultDate = new Date(result.completedAt).toISOString().split('T')[0];
+        return resultDate === dateStr;
+      });
+
+      const hours = (dayQuizzes.reduce((sum, q) => sum + q.totalQuestions, 0) / 60);
+      
+      return {
+        day: dayNames[date.getDay()],
+        hours: parseFloat(hours.toFixed(1)),
+        exercises: dayQuizzes.length,
+      };
+    });
+  };
+
+  const calculateStreak = (quizResults: any[]) => {
+    if (quizResults.length === 0) return 0;
+
+    // Lấy các ngày unique đã làm quiz
+    const uniqueDates = Array.from(new Set(
+      quizResults.map(result => new Date(result.completedAt).toISOString().split('T')[0])
+    )).sort().reverse();
+
+    if (uniqueDates.length === 0) return 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    // Kiểm tra xem có học hôm nay hoặc hôm qua không
+    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+      return 0;
+    }
+
+    let streak = 1;
+    for (let i = 0; i < uniqueDates.length - 1; i++) {
+      const date1 = new Date(uniqueDates[i]);
+      const date2 = new Date(uniqueDates[i + 1]);
+      const diffDays = Math.floor((date1.getTime() - date2.getTime()) / (1000 * 3600 * 24));
+      
+      if (diffDays === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  };
+
+  const loadAIInsights = async () => {
+    try {
+      setAiInsightsLoading(true);
+      const learningData = await getLearningDataForAnalytics();
+      const insights = await getAnalyticsInsights(learningData);
+      setAiInsights(insights);
+    } catch (error) {
+      console.error('Error loading AI insights:', error);
+    } finally {
+      setAiInsightsLoading(false);
+    }
+  };
+
+  const maxHours = Math.max(...studyData.week.map((d: any) => d.hours), 0.1);
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
+        <AppHeader title="Thống kê" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="mt-4 text-base" style={{ color: '#64748b' }}>
+            Đang tải thống kê...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
@@ -40,7 +169,7 @@ export default function Statistics() {
       
       <ScrollView className="flex-1">
         {/* Period Selector */}
-        <View className="px-6 pt-6 pb-4">
+        {/* <View className="px-6 pt-6 pb-4">
           <View
             className="flex-row p-1 rounded-xl"
             style={{ backgroundColor: '#F8FAFC' }}
@@ -68,10 +197,10 @@ export default function Statistics() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </View> */}
 
         {/* Summary Cards */}
-        <View className="px-6 mb-6">
+        <View className="px-6 mb-6 pt-6">
           <View className="flex-row gap-3 mb-3">
             <View
               className="flex-1 p-4 rounded-2xl"
@@ -144,7 +273,7 @@ export default function Statistics() {
             }}
           >
             <View className="flex-row items-end justify-between" style={{ height: 180 }}>
-              {studyData.week.map((data, index) => {
+              {studyData.week.map((data: any, index: number) => {
                 const barHeight = (data.hours / maxHours) * 140;
                 return (
                   <View key={index} className="items-center flex-1">
@@ -229,7 +358,7 @@ export default function Statistics() {
         </View>
 
         {/* Learning Streak */}
-        <View className="px-6 pb-8">
+        <View className="px-6 pb-4">
           <View className="flex-row items-center mb-4">
             <Ionicons name="flame" size={22} color="#EF4444" />
             <Text className="text-lg font-bold ml-2" style={{ color: '#0f172a' }}>
@@ -247,12 +376,230 @@ export default function Statistics() {
           >
             <Ionicons name="flame" size={80} color="#EF4444" />
             <Text className="text-4xl font-bold mb-2" style={{ color: '#DC2626' }}>
-              15 ngày
+              {streak} ngày
             </Text>
             <Text className="text-sm text-center" style={{ color: '#64748b' }}>
-              Bạn đã học liên tục 15 ngày! Hãy tiếp tục phát huy!
+              {streak > 0 
+                ? `Bạn đã học liên tục ${streak} ngày! Hãy tiếp tục phát huy!`
+                : 'Hãy bắt đầu chuỗi học tập của bạn ngay hôm nay!'
+              }
             </Text>
           </View>
+        </View>
+
+        {/* AI Driven Insights */}
+        <View className="px-6 pb-8">
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center">
+              <Ionicons name="sparkles" size={22} color="#8B5CF6" />
+              <Text className="text-lg font-bold ml-2" style={{ color: '#0f172a' }}>
+                AI Insights
+              </Text>
+            </View>
+            {!aiInsights && (
+              <TouchableOpacity
+                onPress={loadAIInsights}
+                disabled={aiInsightsLoading}
+                className="px-4 py-2 rounded-lg"
+                style={{ backgroundColor: colors.primary }}
+              >
+                {aiInsightsLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+                    Tạo đánh giá
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {aiInsights ? (
+            <View>
+              {/* Summary */}
+              <View
+                className="p-4 rounded-2xl mb-3"
+                style={{
+                  backgroundColor: '#F0F9FF',
+                  borderWidth: 1,
+                  borderColor: '#BAE6FD',
+                }}
+              >
+                <Text className="text-sm leading-6" style={{ color: '#0c4a6e' }}>
+                  {aiInsights.summary}
+                </Text>
+              </View>
+
+              {/* Strengths */}
+              {aiInsights.strengths && aiInsights.strengths.length > 0 && (
+                <View className="mb-3">
+                  <Text className="text-base font-semibold mb-2" style={{ color: '#0f172a' }}>
+                    💪 Điểm mạnh
+                  </Text>
+                  {aiInsights.strengths.map((strength, index) => (
+                    <View
+                      key={index}
+                      className="p-3 rounded-xl mb-2"
+                      style={{
+                        backgroundColor: '#DCFCE7',
+                        borderWidth: 1,
+                        borderColor: '#BBF7D0',
+                      }}
+                    >
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-sm font-semibold" style={{ color: '#166534' }}>
+                          {strength.area}
+                        </Text>
+                        <Text className="text-xs font-bold px-2 py-1 rounded-full" style={{ backgroundColor: '#86EFAC', color: '#166534' }}>
+                          {strength.score}/10
+                        </Text>
+                      </View>
+                      <Text className="text-xs" style={{ color: '#15803d' }}>
+                        {strength.description}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Weaknesses */}
+              {aiInsights.weaknesses && aiInsights.weaknesses.length > 0 && (
+                <View className="mb-3">
+                  <Text className="text-base font-semibold mb-2" style={{ color: '#0f172a' }}>
+                    📈 Cần cải thiện
+                  </Text>
+                  {aiInsights.weaknesses.map((weakness, index) => (
+                    <View
+                      key={index}
+                      className="p-3 rounded-xl mb-2"
+                      style={{
+                        backgroundColor: '#FEF3C7',
+                        borderWidth: 1,
+                        borderColor: '#FDE68A',
+                      }}
+                    >
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-sm font-semibold" style={{ color: '#92400e' }}>
+                          {weakness.area}
+                        </Text>
+                        <Text className="text-xs font-bold px-2 py-1 rounded-full" style={{ backgroundColor: '#FCD34D', color: '#92400e' }}>
+                          {weakness.score}/10
+                        </Text>
+                      </View>
+                      <Text className="text-xs mb-1" style={{ color: '#a16207' }}>
+                        {weakness.description}
+                      </Text>
+                      <Text className="text-xs font-semibold" style={{ color: '#78350f' }}>
+                        💡 {weakness.improvement_tips}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Recommendations */}
+              {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
+                <View className="mb-3">
+                  <Text className="text-base font-semibold mb-2" style={{ color: '#0f172a' }}>
+                    🎯 Gợi ý
+                  </Text>
+                  {aiInsights.recommendations.map((rec, index) => (
+                    <View
+                      key={index}
+                      className="p-3 rounded-xl mb-2"
+                      style={{
+                        backgroundColor: '#EDE9FE',
+                        borderWidth: 1,
+                        borderColor: '#DDD6FE',
+                      }}
+                    >
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-sm font-semibold flex-1" style={{ color: '#5b21b6' }}>
+                          {rec.title}
+                        </Text>
+                        <Text 
+                          className="text-xs font-bold px-2 py-1 rounded-full ml-2"
+                          style={{ 
+                            backgroundColor: rec.priority === 'high' ? '#FCA5A5' : rec.priority === 'medium' ? '#FCD34D' : '#93C5FD',
+                            color: rec.priority === 'high' ? '#991B1B' : rec.priority === 'medium' ? '#92400E' : '#1E3A8A'
+                          }}
+                        >
+                          {rec.priority === 'high' ? 'Cao' : rec.priority === 'medium' ? 'TB' : 'Thấp'}
+                        </Text>
+                      </View>
+                      <Text className="text-xs mb-2" style={{ color: '#6b21a8' }}>
+                        {rec.description}
+                      </Text>
+                      {rec.action_items && rec.action_items.length > 0 && (
+                        <View>
+                          {rec.action_items.map((action, idx) => (
+                            <Text key={idx} className="text-xs mb-1" style={{ color: '#7c3aed' }}>
+                              • {action}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Next Focus */}
+              {aiInsights.next_focus && (
+                <View
+                  className="p-4 rounded-2xl"
+                  style={{
+                    backgroundColor: '#FFF7ED',
+                    borderWidth: 1,
+                    borderColor: '#FFEDD5',
+                  }}
+                >
+                  <Text className="text-sm font-semibold mb-1" style={{ color: '#9a3412' }}>
+                    🎓 Tiếp theo nên học
+                  </Text>
+                  <Text className="text-sm" style={{ color: '#c2410c' }}>
+                    {aiInsights.next_focus}
+                  </Text>
+                </View>
+              )}
+
+              {/* Refresh Button */}
+              <TouchableOpacity
+                onPress={loadAIInsights}
+                disabled={aiInsightsLoading}
+                className="mt-3 p-3 rounded-xl items-center flex-row justify-center"
+                style={{ backgroundColor: '#F1F5F9' }}
+              >
+                {aiInsightsLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="refresh" size={16} color={colors.primary} />
+                    <Text className="text-sm font-semibold ml-2" style={{ color: colors.primary }}>
+                      Làm mới đánh giá
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View
+              className="p-6 rounded-2xl items-center"
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+              }}
+            >
+              <Ionicons name="analytics-outline" size={60} color="#94A3B8" />
+              <Text className="text-base font-semibold mt-3 mb-2" style={{ color: '#475569' }}>
+                Phân tích AI về quá trình học
+              </Text>
+              <Text className="text-sm text-center mb-4" style={{ color: '#64748b' }}>
+                AI sẽ phân tích dữ liệu học tập của bạn và đưa ra những insights hữu ích
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

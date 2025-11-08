@@ -4,19 +4,21 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
     ScrollView,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { createResource, pollResourceStatus } from '../api/resourceApi';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 import * as localStorage from '../services/localStorage';
-import type { RoadmapResult, SubTopic } from '../types/api';
+import type { ResourceJobStatus, RoadmapResult, SubTopic } from '../types/api';
 
 interface RoadmapDetailProps {
   route: {
@@ -26,17 +28,74 @@ interface RoadmapDetailProps {
       description?: string;
       courseId?: string; // Nếu có thì đang xem course có sẵn, không thì tạo mới
       quizQuestionsPerLesson?: number; // Số câu hỏi mỗi bài quiz
+      resource?: string; // Tài liệu học tập
+      knowledgeLevel?: string;
+      studyTime?: string;
     };
   };
   navigation: any;
 }
 
 export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps) {
-  const { roadmap, topic, description = '', courseId: existingCourseId, quizQuestionsPerLesson = 10 } = route.params;
+  const { 
+    roadmap, 
+    topic, 
+    description = '', 
+    courseId: existingCourseId, 
+    quizQuestionsPerLesson = 10,
+    resource,
+    knowledgeLevel,
+    studyTime,
+  } = route.params;
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set(['tuần 1']));
   const [completedSubTopics, setCompletedSubTopics] = useState<Set<string>>(new Set());
   const [courseId, setCourseId] = useState<string | null>(existingCourseId || null);
   const [questionsPerQuiz, setQuestionsPerQuiz] = useState<number>(quizQuestionsPerLesson);
+  const [courseResource, setCourseResource] = useState<string | undefined>(resource);
+  const [isLoadingResource, setIsLoadingResource] = useState(false);
+  const [quizResults, setQuizResults] = useState<localStorage.QuizResult[]>([]);
+
+  // Load quiz results khi có courseId
+  useEffect(() => {
+    const loadQuizResults = async () => {
+      if (courseId) {
+        try {
+          const results = await localStorage.getCourseQuizResults(courseId);
+          setQuizResults(results);
+          console.log('📊 Loaded quiz results:', results.length);
+        } catch (error) {
+          console.error('Error loading quiz results:', error);
+        }
+      }
+    };
+
+    loadQuizResults();
+  }, [courseId]);
+
+  // Reload quiz results khi màn hình được focus (quay lại từ Quiz)
+  useFocusEffect(
+    React.useCallback(() => {
+      const reloadQuizResults = async () => {
+        if (courseId) {
+          try {
+            const results = await localStorage.getCourseQuizResults(courseId);
+            setQuizResults(results);
+            console.log('🔄 Reloaded quiz results:', results.length);
+            
+            // Cũng reload completed subtopics
+            const course = await localStorage.getCourseById(courseId);
+            if (course) {
+              setCompletedSubTopics(new Set(course.completedSubTopics));
+            }
+          } catch (error) {
+            console.error('Error reloading quiz results:', error);
+          }
+        }
+      };
+
+      reloadQuizResults();
+    }, [courseId])
+  );
 
   // Initialize course - tạo mới hoặc load từ database
   useEffect(() => {
@@ -49,10 +108,19 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
             setCourseId(course.id);
             setCompletedSubTopics(new Set(course.completedSubTopics));
             setQuestionsPerQuiz(course.quizQuestionsPerLesson || 10);
+            setCourseResource(course.resource); // Load resource nếu có
           }
         } else {
-          // Tạo course mới
-          const newCourse = await localStorage.createCourse(topic, description, roadmap, quizQuestionsPerLesson);
+          // Tạo course mới (không có resource ban đầu)
+          const newCourse = await localStorage.createCourse(
+            topic, 
+            description, 
+            roadmap, 
+            quizQuestionsPerLesson,
+            undefined, // Không có resource lúc tạo
+            knowledgeLevel,
+            studyTime
+          );
           setCourseId(newCourse.id);
           console.log('✅ New course created and saved:', newCourse.id);
         }
@@ -138,12 +206,75 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
     return Math.round((completedSubTopics.size / totalSubTopics) * 100);
   };
 
+  // Kiểm tra xem subtopic đã có quiz result chưa
+  const getQuizResultForSubtopic = (weekTitle: string, subtopic: string) => {
+    return quizResults.find(
+      (result) => result.weekTitle === weekTitle && result.subtopic === subtopic
+    );
+  };
+
+  // Xem lại kết quả quiz
+  const handleViewQuizResult = (subtopic: SubTopic, weekTitle: string, weekKey: string) => {
+    const quizResult = getQuizResultForSubtopic(weekTitle, subtopic['chủ đề con']);
+    
+    if (!quizResult) {
+      Alert.alert('Lỗi', 'Không tìm thấy kết quả quiz');
+      return;
+    }
+
+    // Navigate to Quiz screen với kết quả có sẵn
+    navigation.navigate('Quiz', {
+      courseId,
+      course: topic,
+      topic: weekTitle,
+      weekKey,
+      subtopic: subtopic['chủ đề con'],
+      description: subtopic['mô tả'],
+      numQuestions: questionsPerQuiz,
+      existingQuizResult: quizResult, // Pass kết quả có sẵn
+    });
+  };
+
   const handleStartQuiz = (subtopic: SubTopic, weekTitle: string, weekKey: string) => {
     if (!courseId) {
       Alert.alert('Lỗi', 'Không tìm thấy khoá học');
       return;
     }
 
+    // Kiểm tra xem đã có quiz result chưa
+    const existingResult = getQuizResultForSubtopic(weekTitle, subtopic['chủ đề con']);
+    
+    if (existingResult) {
+      // Đã có kết quả, hỏi user muốn làm gì
+      Alert.alert(
+        'Đã hoàn thành',
+        `Bạn đã làm quiz này và đạt ${existingResult.score}%. Bạn muốn làm gì?`,
+        [
+          {
+            text: 'Xem lại kết quả',
+            onPress: () => handleViewQuizResult(subtopic, weekTitle, weekKey),
+          },
+          {
+            text: 'Làm lại',
+            onPress: () => {
+              navigation.navigate('Quiz', {
+                courseId,
+                course: topic,
+                topic: weekTitle,
+                weekKey,
+                subtopic: subtopic['chủ đề con'],
+                description: subtopic['mô tả'],
+                numQuestions: questionsPerQuiz,
+              });
+            },
+          },
+          { text: 'Hủy', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    // Chưa có kết quả, làm quiz mới
     navigation.navigate('Quiz', {
       courseId,
       course: topic,
@@ -155,13 +286,97 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
     });
   };
 
+  const handleLoadResource = async () => {
+    if (!courseId) {
+      Alert.alert('Lỗi', 'Không tìm thấy khoá học');
+      return;
+    }
+
+    if (courseResource) {
+      // Đã có resource, hiển thị
+      navigation.navigate('ViewResource', {
+        resource: courseResource,
+        topic: topic,
+        courseId: courseId,
+      });
+      return;
+    }
+
+    setIsLoadingResource(true);
+
+    try {
+      // Tạo resource request
+      const resourceResponse = await createResource({
+        course: topic,
+        knowledge_level: knowledgeLevel || 'Intermediate',
+        description: description || `Học ${topic} từ cơ bản đến nâng cao`,
+        time: studyTime || '5 lessons',
+      });
+
+      // Poll resource status
+      const resourceResult = await pollResourceStatus(
+        resourceResponse.job_id,
+        (status: ResourceJobStatus) => {
+          if (status.status === 'processing') {
+            console.log('AI đang tạo tài liệu học tập...');
+          }
+        },
+        60,
+        2000
+      );
+
+      if (resourceResult.status === 'completed' && resourceResult.result) {
+        // Cập nhật resource vào course
+        const updatedCourse = await localStorage.updateCourseResource(
+          courseId,
+          resourceResult.result
+        );
+        
+        if (updatedCourse) {
+          setCourseResource(resourceResult.result);
+          
+          Alert.alert('Thành công', 'Đã tải tài liệu học tập!', [
+            { text: 'Xem tài liệu', onPress: () => {
+              navigation.navigate('ViewResource', {
+                resource: resourceResult.result,
+                topic: topic,
+                courseId: courseId,
+              });
+            }},
+            { text: 'Đóng', style: 'cancel' },
+          ]);
+        }
+      } else {
+        throw new Error(resourceResult.error || 'Không thể tạo tài liệu');
+      }
+    } catch (error: any) {
+      console.error('Error loading resource:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể tải tài liệu. Vui lòng thử lại.');
+    } finally {
+      setIsLoadingResource(false);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
       <AppHeader title="Lộ Trình Học Tập" />
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {/* Back Button */}
+        <View className="px-6 pt-4 pb-2">
+          <TouchableOpacity
+            className="flex-row items-center"
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.primary} />
+            <Text className="text-sm font-medium ml-2" style={{ color: colors.primary }}>
+              Quay lại
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Header Card */}
-        <View className="px-6 pt-6 pb-4">
+        <View className="px-6 pt-2 pb-4">
           <View
             className="rounded-2xl p-6"
             style={{
@@ -241,6 +456,36 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
                 </Text>
               </View>
             </View>
+
+            {/* Load Resource Button */}
+            <TouchableOpacity
+              className="mt-4 rounded-xl p-3 flex-row items-center justify-center"
+              style={{
+                backgroundColor: courseResource ? 'rgba(255,255,255,0.2)' : '#FFFFFF',
+                opacity: isLoadingResource ? 0.6 : 1,
+              }}
+              onPress={handleLoadResource}
+              disabled={isLoadingResource}
+            >
+              <Ionicons
+                name={courseResource ? 'document-text' : 'cloud-download'}
+                size={20}
+                color={courseResource ? '#FFFFFF' : colors.primary}
+                style={{ marginRight: 8 }}
+              />
+              <Text
+                className="font-semibold"
+                style={{
+                  color: courseResource ? '#FFFFFF' : colors.primary,
+                }}
+              >
+                {isLoadingResource
+                  ? 'Đang tải tài liệu...'
+                  : courseResource
+                  ? 'Xem tài liệu'
+                  : 'Tải tài liệu'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -420,21 +665,44 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
                               </Text>
 
                               {/* Quiz Button */}
-                              <TouchableOpacity
-                                className="flex-row items-center justify-center py-2 rounded-lg"
-                                style={{
-                                  backgroundColor: colors.primary + '15',
-                                }}
-                                onPress={() => handleStartQuiz(subTopic, week.title, week.weekKey)}
-                              >
-                                <Ionicons name="school" size={16} color={colors.primary} />
-                                <Text
-                                  className="text-xs font-semibold ml-1"
-                                  style={{ color: colors.primary }}
-                                >
-                                  Làm Quiz
-                                </Text>
-                              </TouchableOpacity>
+                              {(() => {
+                                const quizResult = getQuizResultForSubtopic(week.title, subTopic['chủ đề con']);
+                                const hasQuizResult = !!quizResult;
+                                
+                                return (
+                                  <TouchableOpacity
+                                    className="flex-row items-center justify-center py-2 rounded-lg"
+                                    style={{
+                                      backgroundColor: hasQuizResult 
+                                        ? (quizResult.score >= 70 ? '#10B981' + '20' : '#EF4444' + '20')
+                                        : colors.primary + '15',
+                                    }}
+                                    onPress={() => handleStartQuiz(subTopic, week.title, week.weekKey)}
+                                  >
+                                    <Ionicons 
+                                      name={hasQuizResult ? (quizResult.score >= 70 ? "checkmark-circle" : "refresh") : "school"} 
+                                      size={16} 
+                                      color={hasQuizResult 
+                                        ? (quizResult.score >= 70 ? '#10B981' : '#EF4444')
+                                        : colors.primary
+                                      } 
+                                    />
+                                    <Text
+                                      className="text-xs font-semibold ml-1"
+                                      style={{ 
+                                        color: hasQuizResult 
+                                          ? (quizResult.score >= 70 ? '#10B981' : '#EF4444')
+                                          : colors.primary
+                                      }}
+                                    >
+                                      {hasQuizResult 
+                                        ? `${quizResult.score}% - Xem lại`
+                                        : 'Làm Quiz'
+                                      }
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })()}
                             </TouchableOpacity>
                           </View>
                         </View>

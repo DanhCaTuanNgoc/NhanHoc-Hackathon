@@ -1,16 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Platform } from 'react-native';
 import { colors } from '../constants/theme';
+import Chat from '../screens/Chat';
 import Dashboard from '../screens/Dashboard';
 import Exercises from '../screens/Exercises';
 import Login from '../screens/Login';
-import Profile from '../screens/Profile';
 import Quiz from '../screens/Quiz';
 import RoadmapDetail from '../screens/RoadmapDetail';
 import Settings from '../screens/Settings';
 import Statistics from '../screens/Statistics';
 import UploadDocument from '../screens/UploadDocument';
+import ViewResource from '../screens/ViewResource';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -27,14 +29,13 @@ function TabNavigator() {
           if (route.name === 'Dashboard') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Statistics') {
-            iconName = focused ? 'time' : 'time-outline';
+            iconName = focused ? 'analytics' : 'analytics-outline';
+          } else if (route.name === 'Chat') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'Exercises') {
+            iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'UploadDocument') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
-            iconSize = 30; // Slightly larger size for center button
-          } else if (route.name === 'Exercises') {
-            iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'Profile') {
-            iconName = focused ? 'layers' : 'layers-outline';
           }
 
           return <Ionicons name={iconName} size={iconSize} color={color} />;
@@ -46,9 +47,11 @@ function TabNavigator() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E2E8F0',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: Platform.OS === 'ios' ? 85 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 25 : 8,
+          paddingTop: Platform.OS === 'ios' ? 10 : 0,
+          elevation: 0,
+          shadowOpacity: 0,
         },
       })}
     >
@@ -69,8 +72,8 @@ function TabNavigator() {
         component={Exercises}
       />
       <Tab.Screen 
-        name="Profile" 
-        component={Profile}
+        name="Chat" 
+        component={Chat}
       />
     </Tab.Navigator>
   );
@@ -89,6 +92,8 @@ export default function AppNavigator() {
       <Stack.Screen name="Settings" component={Settings} />
       <Stack.Screen name="RoadmapDetail" component={RoadmapDetail} />
       <Stack.Screen name="Quiz" component={Quiz} />
+      <Stack.Screen name="ViewResource" component={ViewResource} />
+      <Stack.Screen name="UploadDocument" component={UploadDocument} />
     </Stack.Navigator>
   );
 }

@@ -1,8 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 import type { Course } from '../services/localStorage';
@@ -64,7 +63,7 @@ export default function Exercises({ navigation }: ExercisesProps) {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Các khoá học" />
+      <AppHeader title="Các khoá học của bạn" />
       
       <ScrollView className="flex-1">
         {/* Stats Overview */}
@@ -250,6 +249,7 @@ export default function Exercises({ navigation }: ExercisesProps) {
                   }}
                   onPress={() => {
                     // TODO: Navigate to statistics
+                    navigation.navigate("Statistics");
                   }}
                 >
                   <Ionicons name="stats-chart-outline" size={18} color="#64748b" />

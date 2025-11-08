@@ -8,7 +8,7 @@ import { ApiException, RequestConfig } from '../types/api';
 
 // Enable detailed logging only in development
 const __DEV__ = process.env.NODE_ENV === 'development';
-const ENABLE_API_LOGS = false; // Set to true to see detailed API logs
+const ENABLE_API_LOGS = true; // Set to true to see detailed API logs
 
 class ApiClient {
   private baseURL: string;
@@ -108,8 +108,14 @@ class ApiClient {
 
     try {
       this.log(`🌐 API Request: ${config.method || 'GET'} ${url}`);
+      if (config.body) {
+        this.log('📦 Request Body:', config.body);
+      }
       
       const response = await fetch(url, requestConfig);
+      
+      this.log(`📡 Response Status: ${response.status} ${response.statusText}`);
+      
       const data = await this.handleResponse<T>(response);
       
       this.log(`✅ API Response: ${config.method || 'GET'} ${url}`, data);
@@ -117,18 +123,23 @@ class ApiClient {
       return data;
     } catch (error) {
       if (error instanceof ApiException) {
-        this.logError(`❌ API Error: ${error.message}`, error);
+        // Chỉ log vào console.log (không dùng console.error để tránh hiển thị error màu đỏ)
+        this.log(`⚠️ API Error: ${error.message}`, {
+          statusCode: error.statusCode,
+          url,
+          method: config.method,
+        });
         throw error;
       }
 
       // Handle abort/timeout errors
       if (error instanceof Error && error.name === 'AbortError') {
-        this.logError('⏱️ Request timeout');
+        this.log('⏱️ Request timeout');
         throw new ApiException('Request timeout', 408);
       }
 
       // Handle network errors
-      this.logError('🔌 Network error:', error);
+      this.log('🔌 Network error:', error);
       throw new ApiException('Network error', 0);
     }
   }

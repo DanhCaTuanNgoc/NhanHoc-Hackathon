@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { createRoadmap, pollRoadmapStatus, type RoadmapJobStatus } from '../api';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
@@ -41,9 +40,6 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
     setStatusMessage('Đang khởi tạo...');
 
     try {
-      // Gọi API để tạo lộ trình học tập
-      setStatusMessage('Đang gửi yêu cầu đến AI...');
-      
       // Convert audienceLevel to knowledge_level format
       const knowledgeLevelMap = {
         'beginner': 'Beginner' as const,
@@ -51,39 +47,46 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
         'advanced': 'Advanced' as const,
       };
       
-      const response = await createRoadmap({
+      const knowledgeLevel = knowledgeLevelMap[options.audienceLevel];
+      const studyTime = `${options.lessonCount} lessons`;
+      
+      setStatusMessage('Đang gửi yêu cầu đến AI...');
+      
+      // Chỉ tạo roadmap
+      const roadmapResponse = await createRoadmap({
         topic: topic.trim(),
-        time: `${options.lessonCount} lessons`,
-        knowledge_level: knowledgeLevelMap[options.audienceLevel],
+        time: studyTime,
+        knowledge_level: knowledgeLevel,
       });
 
-      const jobId = response.job_id;
       setStatusMessage('Đang xử lý...');
-      
       setProgress(20);
 
-      // Poll job status
-      const result = await pollRoadmapStatus(
-        jobId,
+      // Poll roadmap status
+      const roadmapResult = await pollRoadmapStatus(
+        roadmapResponse.job_id,
         (status: RoadmapJobStatus) => {
-          // Update progress based on status
           if (status.status === 'processing') {
             setProgress((prev) => Math.min(prev + 5, 90));
             setStatusMessage('AI đang tạo lộ trình học tập...');
           }
         },
-        60, // max attempts
-        2000 // interval 2s 
-      );      if (result.status === 'completed') {
+        60,
+        2000
+      );
+
+      if (roadmapResult.status === 'completed') {
         setProgress(100);
         setStatusMessage('Hoàn thành!');
         
-        // Navigate to roadmap detail screen
+        // Navigate to roadmap detail screen (không có resource)
         navigation.navigate('RoadmapDetail', {
-          roadmap: result.result,
+          roadmap: roadmapResult.result,
           topic: topic.trim(),
           description: description.trim(),
           quizQuestionsPerLesson: options.quizPerLesson,
+          knowledgeLevel,
+          studyTime,
         });
         
         // Reset form
@@ -92,10 +95,10 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
         setProgress(0);
         setStatusMessage('');
       } else {
-        throw new Error(result.error || 'Không thể tạo lộ trình học tập');
+        throw new Error(roadmapResult.error || 'Không thể tạo lộ trình học tập');
       }
     } catch (error: any) {
-      console.error('Error generating learning path:', error);
+      console.error('Error generating roadmap:', error);
       setProgress(0);
       setStatusMessage('');
       
