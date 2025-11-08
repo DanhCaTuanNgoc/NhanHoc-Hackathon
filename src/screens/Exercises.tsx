@@ -6,6 +6,7 @@ import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 import type { Course } from '../services/localStorage';
 import * as localStorage from '../services/localStorage';
+import { useCourseStore, useQuizStore } from '../stores';
 
 interface ExercisesProps {
   navigation: any;
@@ -13,7 +14,12 @@ interface ExercisesProps {
 
 export default function Exercises({ navigation }: ExercisesProps) {
   const [selectedTab, setSelectedTab] = useState<'active' | 'completed'>('active');
-  const [courses, setCourses] = useState<Course[]>([]);
+  
+  // 🔥 Sử dụng Zustand stores thay vì local state
+  const courses = useCourseStore((state) => state.courses);
+  const quizResults = useQuizStore((state) => state.quizResults);
+  const setCourses = useCourseStore((state) => state.setCourses);
+  
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalQuizzes: 0,
@@ -25,21 +31,28 @@ export default function Exercises({ navigation }: ExercisesProps) {
   useFocusEffect(
     useCallback(() => {
       loadCourses();
-    }, [])
+    }, [quizResults]) // 🔥 Re-load khi quizResults thay đổi
   );
 
   const loadCourses = async () => {
     try {
       setLoading(true);
       const allCourses = await localStorage.getAllCourses();
+      
+      // 🔥 Cập nhật Zustand store
       setCourses(allCourses);
 
-      // Load statistics
-      const statistics = await localStorage.getStatistics();
+      // Calculate statistics from quiz results
+      const totalQuizzes = quizResults.length;
+      const activeCourses = allCourses.filter(c => c.status === 'active').length;
+      const averageScore = quizResults.length > 0
+        ? Math.round(quizResults.reduce((sum, r) => sum + r.score, 0) / quizResults.length)
+        : 0;
+
       setStats({
-        totalQuizzes: statistics.totalQuizzes,
-        activeCourses: statistics.activeCourses,
-        averageScore: statistics.averageScore,
+        totalQuizzes,
+        activeCourses,
+        averageScore,
       });
     } catch (error) {
       console.error('Error loading courses:', error);

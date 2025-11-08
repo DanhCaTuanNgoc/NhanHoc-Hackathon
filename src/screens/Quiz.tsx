@@ -18,6 +18,7 @@ import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 import { useQuiz } from '../hooks/useQuiz';
 import * as localStorage from '../services/localStorage';
+import { useCourseStore, useQuizStore } from '../stores';
 
 // Backend returns English keys
 interface QuizQuestionData {
@@ -55,6 +56,10 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
     existingQuizResult 
   } = route.params;
   const { createAndWait } = useQuiz();
+  
+  // 🔥 Thêm Zustand stores
+  const addQuizResult = useQuizStore((state) => state.addQuizResult);
+  const updateCourse = useCourseStore((state) => state.updateCourse);
 
   const [questions, setQuestions] = useState<QuizQuestionData[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -186,9 +191,24 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
       console.log('✅ Quiz result saved:', savedResult);
       console.log('💯 Score:', savedResult.score, '%');
 
+      // 🔥 CẬP NHẬT ZUSTAND STORE NGAY LẬP TỨC
+      addQuizResult(savedResult);
+      console.log('✅ Zustand QuizStore updated');
+
       // Mark subtopic as completed
       await localStorage.markSubTopicCompleted(courseId, weekKey, subtopic);
       console.log('✅ Subtopic marked as completed');
+
+      // 🔥 CẬP NHẬT COURSE PROGRESS trong Zustand
+      const updatedCourse = await localStorage.getCourseById(courseId);
+      if (updatedCourse) {
+        updateCourse(courseId, {
+          completedSubTopics: updatedCourse.completedSubTopics,
+          progress: updatedCourse.progress,
+          status: updatedCourse.status,
+        });
+        console.log('✅ Zustand CourseStore updated');
+      }
 
       setShowResults(true);
       console.log('✅ Quiz result saved successfully - Total:', savedResult.totalQuestions, 'Score:', savedResult.score);

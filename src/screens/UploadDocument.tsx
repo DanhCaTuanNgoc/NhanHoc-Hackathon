@@ -114,7 +114,7 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Tạo khoá học với AI" />
+      <AppHeader title="Khoá học với AI" />
       <ScrollView className="flex-1 px-6 pt-6">
         {/* Page Description */}
         {/* <View className="mb-6">
@@ -208,7 +208,7 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
             <View className="flex-row items-center mb-3">
               <Ionicons name="settings-outline" size={20} color="#6366F1" />
               <Text className="text-base font-bold ml-2" style={{ color: '#0f172a' }}>
-                Tùy chọn lộ trình
+                Tùy chọn khoá học
               </Text>
             </View>
 
@@ -315,7 +315,7 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
               <View className="flex-row items-center">
                 <Ionicons name="sparkles" size={20} color="#FFFFFF" />
                 <Text className="text-base font-bold ml-2" style={{ color: '#FFFFFF' }}>
-                  Tạo lộ trình với AI
+                  Tạo khoá học với AI
                 </Text>
               </View>
             )}

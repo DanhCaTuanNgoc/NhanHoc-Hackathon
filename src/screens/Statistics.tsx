@@ -1,138 +1,132 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { AIInsights, getAnalyticsInsights } from '../api/analyticsApi';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
-import { getAllCourses, getAllQuizResults, getLearningDataForAnalytics } from '../services/localStorage';
+import { useInitializeStores } from '../hooks/useInitializeStores';
+import { getLearningDataForAnalytics } from '../services/localStorage';
+import { useCourseStore, useQuizStore } from '../stores';
 
 const screenWidth = Dimensions.get('window').width;
 
+// 🔥 Helper functions - Định nghĩa ngoài component để tránh lỗi
+const calculateWeekData = (quizResults: any[]) => {
+  const today = new Date();
+  const last7Days = [];
+  
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    last7Days.push(date);
+  }
+
+  const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  
+  return last7Days.map(date => {
+    const dateStr = date.toISOString().split('T')[0];
+    const dayQuizzes = quizResults.filter(result => {
+      const resultDate = new Date(result.completedAt).toISOString().split('T')[0];
+      return resultDate === dateStr;
+    });
+
+    const hours = (dayQuizzes.reduce((sum, q) => sum + q.totalQuestions, 0) / 60);
+    
+    return {
+      day: dayNames[date.getDay()],
+      hours: parseFloat(hours.toFixed(1)),
+      exercises: dayQuizzes.length,
+    };
+  });
+};
+
+const calculateStreak = (quizResults: any[]) => {
+  if (quizResults.length === 0) return 0;
+
+  // Lấy các ngày unique đã làm quiz
+  const uniqueDates = Array.from(new Set(
+    quizResults.map(result => new Date(result.completedAt).toISOString().split('T')[0])
+  )).sort().reverse();
+
+  if (uniqueDates.length === 0) return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  // Kiểm tra xem có học hôm nay hoặc hôm qua không
+  if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+    return 0;
+  }
+
+  let streak = 1;
+  for (let i = 0; i < uniqueDates.length - 1; i++) {
+    const date1 = new Date(uniqueDates[i]);
+    const date2 = new Date(uniqueDates[i + 1]);
+    const diffDays = Math.floor((date1.getTime() - date2.getTime()) / (1000 * 3600 * 24));
+    
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+};
+
 export default function Statistics() {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('week');
-  const [loading, setLoading] = useState(true);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState<AIInsights | null>(null);
   
-  // Real data from localStorage
-  const [totalHours, setTotalHours] = useState(0);
-  const [totalExercises, setTotalExercises] = useState(0);
-  const [avgScore, setAvgScore] = useState(0);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [studyData, setStudyData] = useState<any>({ week: [] });
-  const [streak, setStreak] = useState(0);
+  // 🔥 Khởi tạo stores từ localStorage
+  const { isInitialized } = useInitializeStores();
+  
+  // 🔥 Sử dụng Zustand stores - TỰ ĐỘNG CẬP NHẬT khi data thay đổi
+  const courses = useCourseStore((state) => state.courses);
+  const quizResults = useQuizStore((state) => state.quizResults);
+  const hasHydrated = useCourseStore((state) => state._hasHydrated) && 
+                      useQuizStore((state) => state._hasHydrated);
 
-  useEffect(() => {
-    loadStatistics();
-  }, []);
+  // 🔥 Tính toán statistics từ Zustand stores - TỰ ĐỘNG RE-RENDER khi data thay đổi
+  const statistics = useMemo(() => {
+    // Tính tổng thời gian học (từ quiz - giả sử mỗi câu hỏi mất 1 phút)
+    const totalTimeMinutes = quizResults.reduce((sum, result) => {
+      return sum + result.totalQuestions;
+    }, 0);
+    const totalHours = totalTimeMinutes / 60;
 
-  const loadStatistics = async () => {
-    try {
-      setLoading(true);
-      const courses = await getAllCourses();
-      const quizResults = await getAllQuizResults();
+    // Tổng số bài tập (quiz)
+    const totalExercises = quizResults.length;
 
-      // Tính tổng thời gian học (từ quiz - giả sử mỗi câu hỏi mất 1 phút)
-      const totalTimeMinutes = quizResults.reduce((sum, result) => {
-        return sum + result.totalQuestions;
-      }, 0);
-      setTotalHours(totalTimeMinutes / 60);
+    // Điểm trung bình
+    const avgScore = quizResults.length > 0
+      ? Math.round(quizResults.reduce((sum, result) => sum + result.score, 0) / quizResults.length)
+      : 0;
 
-      // Tổng số bài tập (quiz)
-      setTotalExercises(quizResults.length);
+    // Subjects progress (từ courses)
+    const subjects = courses.map(course => ({
+      name: course.topic,
+      progress: course.progress,
+      color: course.color,
+      icon: course.icon,
+    }));
 
-      // Điểm trung bình
-      if (quizResults.length > 0) {
-        const avgScoreCalc = quizResults.reduce((sum, result) => sum + result.score, 0) / quizResults.length;
-        setAvgScore(Math.round(avgScoreCalc));
-      }
+    // Study data per week (từ quiz results trong 7 ngày gần nhất)
+    const weekData = calculateWeekData(quizResults);
 
-      // Subjects progress (từ courses)
-      const subjectsData = courses.map(course => ({
-        name: course.topic,
-        progress: course.progress,
-        color: course.color,
-        icon: course.icon,
-      }));
-      setSubjects(subjectsData);
+    // Calculate streak
+    const streak = calculateStreak(quizResults);
 
-      // Study data per week (từ quiz results trong 7 ngày gần nhất)
-      const weekData = calculateWeekData(quizResults);
-      setStudyData({ week: weekData });
-
-      // Calculate streak
-      const streakDays = calculateStreak(quizResults);
-      setStreak(streakDays);
-
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateWeekData = (quizResults: any[]) => {
-    const today = new Date();
-    const last7Days = [];
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      last7Days.push(date);
-    }
-
-    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    
-    return last7Days.map(date => {
-      const dateStr = date.toISOString().split('T')[0];
-      const dayQuizzes = quizResults.filter(result => {
-        const resultDate = new Date(result.completedAt).toISOString().split('T')[0];
-        return resultDate === dateStr;
-      });
-
-      const hours = (dayQuizzes.reduce((sum, q) => sum + q.totalQuestions, 0) / 60);
-      
-      return {
-        day: dayNames[date.getDay()],
-        hours: parseFloat(hours.toFixed(1)),
-        exercises: dayQuizzes.length,
-      };
-    });
-  };
-
-  const calculateStreak = (quizResults: any[]) => {
-    if (quizResults.length === 0) return 0;
-
-    // Lấy các ngày unique đã làm quiz
-    const uniqueDates = Array.from(new Set(
-      quizResults.map(result => new Date(result.completedAt).toISOString().split('T')[0])
-    )).sort().reverse();
-
-    if (uniqueDates.length === 0) return 0;
-
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-    // Kiểm tra xem có học hôm nay hoặc hôm qua không
-    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
-      return 0;
-    }
-
-    let streak = 1;
-    for (let i = 0; i < uniqueDates.length - 1; i++) {
-      const date1 = new Date(uniqueDates[i]);
-      const date2 = new Date(uniqueDates[i + 1]);
-      const diffDays = Math.floor((date1.getTime() - date2.getTime()) / (1000 * 3600 * 24));
-      
-      if (diffDays === 1) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
-  };
+    return {
+      totalHours,
+      totalExercises,
+      avgScore,
+      subjects,
+      studyData: { week: weekData },
+      streak,
+    };
+  }, [courses, quizResults]); // 🔥 Tự động recalculate khi courses hoặc quizResults thay đổi
 
   const loadAIInsights = async () => {
     try {
@@ -147,16 +141,18 @@ export default function Statistics() {
     }
   };
 
-  const maxHours = Math.max(...studyData.week.map((d: any) => d.hours), 0.1);
+  // 🔥 Lấy maxHours từ statistics
+  const maxHours = Math.max(...statistics.studyData.week.map((d: any) => d.hours), 0.1);
 
-  if (loading) {
+  // 🔥 Hiển thị loading khi chưa hydrate hoặc chưa initialize xong
+  if (!hasHydrated || !isInitialized) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
         <AppHeader title="Thống kê" />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.primary} />
           <Text className="mt-4 text-base" style={{ color: '#64748b' }}>
-            Đang tải thống kê...
+            {!hasHydrated ? 'Đang khôi phục dữ liệu...' : 'Đang tải thống kê...'}
           </Text>
         </View>
       </SafeAreaView>
@@ -212,7 +208,7 @@ export default function Statistics() {
             >
               <Ionicons name="time" size={24} color={colors.primary} />
               <Text className="text-2xl font-bold mt-2" style={{ color: colors.primary }}>
-                {totalHours.toFixed(1)}h
+                {statistics.totalHours.toFixed(1)}h
               </Text>
               <Text className="text-xs" style={{ color: '#64748b' }}>
                 Thời gian học
@@ -229,7 +225,7 @@ export default function Statistics() {
             >
               <Ionicons name="checkmark-done" size={24} color={colors.accent} />
               <Text className="text-2xl font-bold mt-2" style={{ color: colors.accent }}>
-                {totalExercises}
+                {statistics.totalExercises}
               </Text>
               <Text className="text-xs" style={{ color: '#64748b' }}>
                 Bài tập
@@ -246,7 +242,7 @@ export default function Statistics() {
             >
               <Ionicons name="trophy" size={24} color={colors.success} />
               <Text className="text-2xl font-bold mt-2" style={{ color: colors.success }}>
-                {avgScore}%
+                {statistics.avgScore}%
               </Text>
               <Text className="text-xs" style={{ color: '#64748b' }}>
                 Điểm TB
@@ -273,7 +269,7 @@ export default function Statistics() {
             }}
           >
             <View className="flex-row items-end justify-between" style={{ height: 180 }}>
-              {studyData.week.map((data: any, index: number) => {
+              {statistics.studyData.week.map((data: any, index: number) => {
                 const barHeight = (data.hours / maxHours) * 140;
                 return (
                   <View key={index} className="items-center flex-1">
@@ -311,7 +307,7 @@ export default function Statistics() {
             </Text>
           </View>
 
-          {subjects.map((subject, index) => (
+          {statistics.subjects.map((subject: any, index: number) => (
             <View
               key={index}
               className="mb-3 p-4 rounded-2xl"
@@ -376,11 +372,11 @@ export default function Statistics() {
           >
             <Ionicons name="flame" size={80} color="#EF4444" />
             <Text className="text-4xl font-bold mb-2" style={{ color: '#DC2626' }}>
-              {streak} ngày
+              {statistics.streak} ngày
             </Text>
             <Text className="text-sm text-center" style={{ color: '#64748b' }}>
-              {streak > 0 
-                ? `Bạn đã học liên tục ${streak} ngày! Hãy tiếp tục phát huy!`
+              {statistics.streak > 0 
+                ? `Bạn đã học liên tục ${statistics.streak} ngày! Hãy tiếp tục phát huy!`
                 : 'Hãy bắt đầu chuỗi học tập của bạn ngay hôm nay!'
               }
             </Text>
