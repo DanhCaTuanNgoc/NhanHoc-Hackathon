@@ -6,6 +6,9 @@ import Dashboard from '../screens/Dashboard';
 import Exercises from '../screens/Exercises';
 import Login from '../screens/Login';
 import Profile from '../screens/Profile';
+import Quiz from '../screens/Quiz';
+import RoadmapDetail from '../screens/RoadmapDetail';
+import Settings from '../screens/Settings';
 import Statistics from '../screens/Statistics';
 import UploadDocument from '../screens/UploadDocument';
 
@@ -83,6 +86,9 @@ export default function AppNavigator() {
     >
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="Main" component={TabNavigator} />
+      <Stack.Screen name="Settings" component={Settings} />
+      <Stack.Screen name="RoadmapDetail" component={RoadmapDetail} />
+      <Stack.Screen name="Quiz" component={Quiz} />
     </Stack.Navigator>
   );
 }

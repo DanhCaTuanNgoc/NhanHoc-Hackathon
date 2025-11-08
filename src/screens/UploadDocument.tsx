@@ -1,330 +1,380 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { createRoadmap, pollRoadmapStatus, type RoadmapJobStatus } from '../api';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 
-interface UploadOptions {
+interface GenerateOptions {
   audienceLevel: 'beginner' | 'intermediate' | 'advanced';
+  lessonCount: number;
   includeQuiz: boolean;
-  includeInteractive: boolean;
-  focusAreas: string;
+  quizPerLesson: number;
 }
 
-export default function UploadDocument() {
-  const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [showOptions, setShowOptions] = useState(false);
-  const [options, setOptions] = useState<UploadOptions>({
+interface UploadDocumentProps {
+  navigation: any;
+}
+
+export default function UploadDocument({ navigation }: UploadDocumentProps) {
+  const [topic, setTopic] = useState('');
+  const [description, setDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [options, setOptions] = useState<GenerateOptions>({
     audienceLevel: 'intermediate',
+    lessonCount: 5,
     includeQuiz: true,
-    includeInteractive: true,
-    focusAreas: '',
+    quizPerLesson: 10,
   });
 
-  const handlePickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setSelectedFile(result.assets[0]);
-        setShowOptions(true);
-      }
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể chọn file. Vui lòng thử lại.');
-    }
-  };
-
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
-    setShowOptions(false);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      Alert.alert('Lỗi', 'Vui lòng chọn file PDF để tải lên!');
+  const handleGenerate = async () => {
+    if (!topic.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập chủ đề học tập!');
       return;
     }
 
-    setIsUploading(true);
-    setUploadProgress(0);
+    setIsGenerating(true);
+    setProgress(0);
+    setStatusMessage('Đang khởi tạo...');
 
     try {
-      // Simulate upload progress
-      const interval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      // TODO: Implement actual upload to backend
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Gọi API để tạo lộ trình học tập
+      setStatusMessage('Đang gửi yêu cầu đến AI...');
       
-      clearInterval(interval);
-      setUploadProgress(100);
+      // Convert audienceLevel to knowledge_level format
+      const knowledgeLevelMap = {
+        'beginner': 'Beginner' as const,
+        'intermediate': 'Intermediate' as const,
+        'advanced': 'Advanced' as const,
+      };
+      
+      const response = await createRoadmap({
+        topic: topic.trim(),
+        time: `${options.lessonCount} lessons`,
+        knowledge_level: knowledgeLevelMap[options.audienceLevel],
+      });
+
+      const jobId = response.job_id;
+      setStatusMessage('Đang xử lý...');
+      
+      setProgress(20);
+
+      // Poll job status
+      const result = await pollRoadmapStatus(
+        jobId,
+        (status: RoadmapJobStatus) => {
+          // Update progress based on status
+          if (status.status === 'processing') {
+            setProgress((prev) => Math.min(prev + 5, 90));
+            setStatusMessage('AI đang tạo lộ trình học tập...');
+          }
+        },
+        60, // max attempts
+        2000 // interval 2s 
+      );      if (result.status === 'completed') {
+        setProgress(100);
+        setStatusMessage('Hoàn thành!');
+        
+        // Navigate to roadmap detail screen
+        navigation.navigate('RoadmapDetail', {
+          roadmap: result.result,
+          topic: topic.trim(),
+        });
+        
+        // Reset form
+        setTopic('');
+        setDescription('');
+        setProgress(0);
+        setStatusMessage('');
+      } else {
+        throw new Error(result.error || 'Không thể tạo lộ trình học tập');
+      }
+    } catch (error: any) {
+      console.error('Error generating learning path:', error);
+      setProgress(0);
+      setStatusMessage('');
       
       Alert.alert(
-        'Thành công!',
-        'File đã được tải lên. Đang tạo khóa học...',
-        [{ text: 'OK', onPress: () => {
-          handleRemoveFile();
-          setUploadProgress(0);
-        }}]
+        'Lỗi',
+        error.message || 'Không thể tạo lộ trình học tập. Vui lòng thử lại.',
+        [{ text: 'OK' }]
       );
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể tải file lên. Vui lòng thử lại.');
-      setUploadProgress(0);
     } finally {
-      setIsUploading(false);
+      setIsGenerating(false);
     }
   };
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Upload Tài liệu" />
+      <AppHeader title="Tạo Lộ Trình Học Tập" />
       <ScrollView className="flex-1 px-6 pt-6">
         {/* Page Description */}
         <View className="mb-6">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="book" size={28} color={colors.primary} />
+            <Ionicons name="bulb" size={28} color={colors.primary} />
             <Text className="text-2xl font-bold ml-2" style={{ color: '#0f172a' }}>
-              Tạo khóa học từ PDF
+              Tạo lộ trình với AI
             </Text>
           </View>
           <Text className="text-base leading-6" style={{ color: '#64748b' }}>
-            Tải lên tài liệu PDF và AI sẽ tự động tạo khóa học hoàn chỉnh với bài giảng, bài tập và câu hỏi trắc nghiệm.
+            Nhập chủ đề bạn muốn học và AI sẽ tự động tạo lộ trình học tập hoàn chỉnh với bài giảng và bài kiểm tra.
           </Text>
         </View>
 
-        {/* Upload Area */}
-        {!selectedFile ? (
-          <TouchableOpacity
-            className="rounded-2xl p-8 items-center justify-center mb-6"
-            style={{
-              backgroundColor: '#F8FAFC',
-              borderWidth: 2,
-              borderColor: colors.primary,
-              borderStyle: 'dashed',
-              minHeight: 250,
-            }}
-            onPress={handlePickDocument}
-          >
-            <View
-              className="w-20 h-20 rounded-full items-center justify-center mb-4"
-              style={{ backgroundColor: colors.primary + '20' }}
-            >
-              <Ionicons name="cloud-upload-outline" size={40} color={colors.primary} />
+        {/* Input Form */}
+        <View
+          className="rounded-2xl p-6 mb-6"
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1,
+            borderColor: '#e2e8f0',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 3,
+          }}
+        >
+          {/* Topic Input */}
+          <View className="mb-5">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="school-outline" size={20} color={colors.primary} />
+              <Text className="text-sm font-semibold ml-2" style={{ color: '#64748b' }}>
+                Chủ đề học tập <Text style={{ color: '#EF4444' }}>*</Text>
+              </Text>
             </View>
-            <Text className="text-lg font-bold mb-2" style={{ color: '#0f172a' }}>
-              Chọn file PDF
-            </Text>
-            <Text className="text-sm text-center" style={{ color: '#64748b' }}>
-              Nhấn để chọn file từ thiết bị của bạn
-            </Text>
-            <Text className="text-xs text-center mt-2" style={{ color: '#94a3b8' }}>
-              Hỗ trợ file PDF tối đa 50MB
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          /* Selected File Card */
-          <View
-            className="rounded-2xl p-6 mb-6"
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderWidth: 1,
-              borderColor: '#e2e8f0',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 8,
-              elevation: 3,
-            }}
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-row items-center flex-1">
-                <View
-                  className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-                  style={{ backgroundColor: colors.primary + '20' }}
-                >
-                  <MaterialCommunityIcons name="file-pdf-box" size={28} color={colors.primary} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-base font-semibold mb-1" style={{ color: '#0f172a' }} numberOfLines={1}>
-                    {selectedFile.name}
-                  </Text>
-                  <Text className="text-sm" style={{ color: '#64748b' }}>
-                    {(selectedFile.size! / 1024 / 1024).toFixed(2)} MB
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                className="w-10 h-10 rounded-full items-center justify-center"
-                style={{ backgroundColor: '#FEE2E2' }}
-                onPress={handleRemoveFile}
-              >
-                <Ionicons name="close" size={20} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-
-            <View
-              className="h-px mb-4"
-              style={{ backgroundColor: '#e2e8f0' }}
-            />
-
-            {/* Upload Options */}
-            {showOptions && (
-              <View>
-                <View className="flex-row items-center mb-4">
-                  <Ionicons name="settings-outline" size={20} color="#6366F1" />
-                  <Text className="text-base font-bold ml-2" style={{ color: '#0f172a' }}>
-                    Tùy chọn tạo khóa học
-                  </Text>
-                </View>
-
-                {/* Audience Level */}
-                <View className="mb-4">
-                  <Text className="text-sm font-semibold mb-2" style={{ color: '#64748b' }}>
-                    Trình độ học viên
-                  </Text>
-                  <View className="flex-row gap-2">
-                    {(['beginner', 'intermediate', 'advanced'] as const).map((level) => (
-                      <TouchableOpacity
-                        key={level}
-                        className="flex-1 py-3 rounded-xl items-center"
-                        style={{
-                          backgroundColor: options.audienceLevel === level ? colors.primary : '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: options.audienceLevel === level ? colors.primary : '#e2e8f0',
-                        }}
-                        onPress={() => setOptions({ ...options, audienceLevel: level })}
-                      >
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{ color: options.audienceLevel === level ? '#FFFFFF' : '#64748b' }}
-                        >
-                          {level === 'beginner' ? 'Cơ bản' : level === 'intermediate' ? 'Trung bình' : 'Nâng cao'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Options Toggles */}
-                <View className="space-y-3">
-                  <TouchableOpacity
-                    className="flex-row items-center justify-between py-3 px-4 rounded-xl"
-                    style={{ backgroundColor: '#F8FAFC' }}
-                    onPress={() => setOptions({ ...options, includeQuiz: !options.includeQuiz })}
-                  >
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={options.includeQuiz ? colors.success : '#cbd5e1'}
-                      />
-                      <Text className="text-sm font-medium ml-3" style={{ color: '#0f172a' }}>
-                        Thêm câu hỏi trắc nghiệm
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    className="flex-row items-center justify-between py-3 px-4 rounded-xl"
-                    style={{ backgroundColor: '#F8FAFC' }}
-                    onPress={() => setOptions({ ...options, includeInteractive: !options.includeInteractive })}
-                  >
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={options.includeInteractive ? colors.success : '#cbd5e1'}
-                      />
-                      <Text className="text-sm font-medium ml-3" style={{ color: '#0f172a' }}>
-                        Thêm bài tập tương tác
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* Upload Button */}
-            <TouchableOpacity
-              className="py-4 rounded-xl items-center mt-6"
+            <TextInput
+              className="px-4 py-3 rounded-xl text-base"
               style={{
-                backgroundColor: colors.primary,
-                opacity: isUploading ? 0.7 : 1,
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 5,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: topic ? colors.primary : '#e2e8f0',
+                color: '#0f172a',
               }}
-              onPress={handleUpload}
-              disabled={isUploading}
+              placeholder="VD: Lập trình Python cơ bản"
+              placeholderTextColor="#94a3b8"
+              value={topic}
+              onChangeText={setTopic}
+              autoCapitalize="sentences"
+            />
+          </View>
+
+          {/* Description Input
+          <View className="mb-5">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="document-text-outline" size={20} color={colors.secondary} />
+              <Text className="text-sm font-semibold ml-2" style={{ color: '#64748b' }}>
+                Mô tả chi tiết (tùy chọn)
+              </Text>
+            </View>
+            <TextInput
+              className="px-4 py-3 rounded-xl text-base"
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: description ? colors.secondary : '#e2e8f0',
+                color: '#0f172a',
+                minHeight: 100,
+                textAlignVertical: 'top',
+              }}
+              placeholder="Thêm thông tin về những gì bạn muốn học..."
+              placeholderTextColor="#94a3b8"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              autoCapitalize="sentences"
+            />
+          </View> */}
+
+          {/* Options Section */}
+          <View className="mb-5">
+            <View className="flex-row items-center mb-3">
+              <Ionicons name="settings-outline" size={20} color="#6366F1" />
+              <Text className="text-base font-bold ml-2" style={{ color: '#0f172a' }}>
+                Tùy chọn lộ trình
+              </Text>
+            </View>
+
+            {/* Audience Level */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold mb-2" style={{ color: '#64748b' }}>
+                Trình độ
+              </Text>
+              <View className="flex-row gap-2">
+                {(['beginner', 'intermediate', 'advanced'] as const).map((level) => (
+                  <TouchableOpacity
+                    key={level}
+                    className="flex-1 py-3 rounded-xl items-center"
+                    style={{
+                      backgroundColor: options.audienceLevel === level ? colors.primary : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: options.audienceLevel === level ? colors.primary : '#e2e8f0',
+                    }}
+                    onPress={() => setOptions({ ...options, audienceLevel: level })}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: options.audienceLevel === level ? '#FFFFFF' : '#64748b' }}
+                    >
+                      {level === 'beginner' ? 'Cơ bản' : level === 'intermediate' ? 'Trung bình' : 'Nâng cao'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Lesson Count */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold mb-2" style={{ color: '#64748b' }}>
+                Số bài học: {options.lessonCount}
+              </Text>
+              <View className="flex-row gap-2">
+                {[3, 5, 7, 10].map((count) => (
+                  <TouchableOpacity
+                    key={count}
+                    className="flex-1 py-3 rounded-xl items-center"
+                    style={{
+                      backgroundColor: options.lessonCount === count ? colors.accent : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: options.lessonCount === count ? colors.accent : '#e2e8f0',
+                    }}
+                    onPress={() => setOptions({ ...options, lessonCount: count })}
+                  >
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: options.lessonCount === count ? '#FFFFFF' : '#64748b' }}
+                    >
+                      {count}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Quiz Toggle */}
+            <TouchableOpacity
+              className="flex-row items-center justify-between py-3 px-4 rounded-xl mb-3"
+              style={{ backgroundColor: '#F8FAFC' }}
+              onPress={() => setOptions({ ...options, includeQuiz: !options.includeQuiz })}
             >
-              {isUploading ? (
-                <View className="items-center">
-                  <ActivityIndicator color="#FFFFFF" />
-                  <Text className="text-sm font-semibold mt-2" style={{ color: '#FFFFFF' }}>
-                    Đang tải lên... {uploadProgress}%
-                  </Text>
-                </View>
-              ) : (
-                <View className="flex-row items-center">
-                  <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
-                  <Text className="text-base font-bold ml-2" style={{ color: '#FFFFFF' }}>
-                    Tạo khóa học với AI
-                  </Text>
-                </View>
-              )}
+              <View className="flex-row items-center flex-1">
+                <Ionicons
+                  name="checkmark-circle"
+                  size={24}
+                  color={options.includeQuiz ? colors.success : '#cbd5e1'}
+                />
+                <Text className="text-sm font-medium ml-3" style={{ color: '#0f172a' }}>
+                  Thêm bài kiểm tra (Quiz)
+                </Text>
+              </View>
             </TouchableOpacity>
 
-            {/* Progress Bar */}
-            {isUploading && (
-              <View className="mt-4">
-                <View 
-                  className="h-2 rounded-full overflow-hidden"
-                  style={{ backgroundColor: '#E5E7EB' }}
-                >
-                  <View 
-                    className="h-full rounded-full"
-                    style={{ 
-                      backgroundColor: colors.accent,
-                      width: `${uploadProgress}%`,
-                    }}
-                  />
+            {/* Quiz Count */}
+            {options.includeQuiz && (
+              <View className="ml-4">
+                <Text className="text-sm font-semibold mb-2" style={{ color: '#64748b' }}>
+                  Số câu hỏi mỗi bài: {options.quizPerLesson}
+                </Text>
+                <View className="flex-row gap-2">
+                  {[5, 10, 15, 20].map((count) => (
+                    <TouchableOpacity
+                      key={count}
+                      className="flex-1 py-2 rounded-lg items-center"
+                      style={{
+                        backgroundColor: options.quizPerLesson === count ? colors.secondary : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: options.quizPerLesson === count ? colors.secondary : '#e2e8f0',
+                      }}
+                      onPress={() => setOptions({ ...options, quizPerLesson: count })}
+                    >
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{ color: options.quizPerLesson === count ? '#FFFFFF' : '#64748b' }}
+                      >
+                        {count}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             )}
           </View>
-        )}
+
+          {/* Generate Button */}
+          <TouchableOpacity
+            className="py-4 rounded-xl items-center"
+            style={{
+              backgroundColor: colors.primary,
+              opacity: isGenerating ? 0.7 : 1,
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 5,
+            }}
+            onPress={handleGenerate}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <View className="items-center">
+                <ActivityIndicator color="#FFFFFF" />
+                <Text className="text-sm font-semibold mt-2" style={{ color: '#FFFFFF' }}>
+                  {statusMessage} {progress}%
+                </Text>
+              </View>
+            ) : (
+              <View className="flex-row items-center">
+                <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+                <Text className="text-base font-bold ml-2" style={{ color: '#FFFFFF' }}>
+                  Tạo lộ trình với AI
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Progress Bar */}
+          {isGenerating && (
+            <View className="mt-4">
+              <View 
+                className="h-2 rounded-full overflow-hidden"
+                style={{ backgroundColor: '#E5E7EB' }}
+              >
+                <View 
+                  className="h-full rounded-full"
+                  style={{ 
+                    backgroundColor: colors.accent,
+                    width: `${progress}%`,
+                  }}
+                />
+              </View>
+              {statusMessage && (
+                <Text className="text-xs text-center mt-2" style={{ color: '#64748b' }}>
+                  {statusMessage}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
 
         {/* Features Info */}
         <View className="mb-8">
           <View className="flex-row items-center mb-4">
             <Ionicons name="sparkles" size={22} color="#A855F7" />
             <Text className="text-lg font-bold ml-2" style={{ color: '#0f172a' }}>
-              Tính năng AI
+              AI sẽ tạo cho bạn
             </Text>
           </View>
           
           <View className="space-y-3">
             {[
-              { icon: 'book-outline', color: '#3B82F6', title: 'Tạo bài giảng', desc: 'Tự động tóm tắt và cấu trúc nội dung' },
-              { icon: 'create-outline', color: '#10B981', title: 'Câu hỏi trắc nghiệm', desc: 'Sinh câu hỏi và đáp án thông minh' },
-              { icon: 'game-controller-outline', color: '#F59E0B', title: 'Bài tập tương tác', desc: 'Drag & drop, flashcard, flowchart' },
-              { icon: 'analytics-outline', color: '#8B5CF6', title: 'Theo dõi tiến độ', desc: 'Thống kê học tập chi tiết' },
+              { icon: 'map-outline', color: '#3B82F6', title: 'Lộ trình học tập', desc: 'Cấu trúc bài học logic và chi tiết' },
+              { icon: 'book-outline', color: '#10B981', title: 'Nội dung bài giảng', desc: 'Giải thích dễ hiểu, ví dụ sinh động' },
+              { icon: 'help-circle-outline', color: '#F59E0B', title: 'Bài kiểm tra', desc: 'Câu hỏi trắc nghiệm đa dạng' },
+              { icon: 'trending-up-outline', color: '#8B5CF6', title: 'Theo dõi tiến độ', desc: 'Thống kê và đánh giá kết quả' },
             ].map((feature, index) => (
               <View
                 key={index}

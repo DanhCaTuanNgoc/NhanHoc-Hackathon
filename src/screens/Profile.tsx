@@ -1,11 +1,37 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 
-export default function Profile() {
+type RootStackParamList = {
+  Login: undefined;
+  Main: undefined;
+  Settings: undefined;
+};
+
+type TabParamList = {
+  Dashboard: undefined;
+  Statistics: undefined;
+  UploadDocument: undefined;
+  Exercises: undefined;
+  Profile: undefined;
+};
+
+type ProfileScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Profile'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+interface ProfileProps {
+  navigation: ProfileScreenNavigationProp;
+}
+
+export default function Profile({ navigation }: ProfileProps) {
   const user = {
     name: 'Nguyễn Văn A',
     email: 'nguyenvana@email.com',
@@ -252,6 +278,7 @@ export default function Profile() {
               borderWidth: 1,
               borderColor: '#e2e8f0',
             }}
+            onPress={() => navigation.navigate('Settings')}
           >
             <View
               className="w-10 h-10 rounded-full items-center justify-center mr-3"
