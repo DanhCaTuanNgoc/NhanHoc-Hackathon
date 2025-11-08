@@ -77,6 +77,15 @@ export interface Exercise {
 
 export type RootStackParamList = {
   Login: undefined;
-  Dashboard: undefined;
+  Main: undefined;
   LessonDetail: { lessonId: string };
+};
+
+export type DrawerParamList = {
+  Dashboard: undefined;
+  UploadDocument: undefined;
+  Exercises: undefined;
+  Statistics: undefined;
+  Settings: undefined;
+  Profile: undefined;
 };

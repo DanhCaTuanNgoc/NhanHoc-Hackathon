@@ -37,10 +37,14 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "reactCompiler": true
+    },
+    "extra": {
+      "googleWebClientId": "YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com"
     }
   }
 }

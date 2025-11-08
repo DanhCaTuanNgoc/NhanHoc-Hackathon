@@ -1,13 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,7 +43,7 @@ export default function Login({ navigation }: LoginProps) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Navigate to Dashboard after successful login
-      navigation.replace('Dashboard');
+      navigation.replace('Main');
     } catch (error) {
       Alert.alert('Lỗi', 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
@@ -55,7 +58,7 @@ export default function Login({ navigation }: LoginProps) {
       // TODO: Implement Google Sign-In
       await new Promise(resolve => setTimeout(resolve, 1500));
       Alert.alert('Thành công', 'Đăng nhập Google thành công!');
-      navigation.replace('Dashboard');
+      navigation.replace('Main');
     } catch (error) {
       Alert.alert('Lỗi', 'Đăng nhập Google thất bại. Vui lòng thử lại.');
     } finally {
@@ -69,12 +72,13 @@ export default function Login({ navigation }: LoginProps) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <View className="flex-1 px-6 justify-center">
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View className="flex-1 px-6 justify-center">
           {/* Logo/Title */}
           <View className="items-center mb-10">
             <View className="mb-4 w-20 h-20 rounded-full items-center justify-center" 
                   style={{ backgroundColor: colors.primary }}>
-              <Text className="text-4xl">📚</Text>
+              <Ionicons name="book" size={40} color="#FFFFFF" />
             </View>
             <Text className="text-4xl font-bold mb-2" style={{ color: colors.primary }}>
               Nhàn Học
@@ -190,9 +194,9 @@ export default function Login({ navigation }: LoginProps) {
                 Đăng nhập với Google
               </Text>
             </TouchableOpacity>
-
           </View>
         </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

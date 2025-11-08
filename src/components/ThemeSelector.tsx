@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
@@ -8,11 +9,11 @@ interface ThemeSelectorProps {
   onClose: () => void;
 }
 
-const themeOptions: { mode: ThemeMode; name: string; emoji: string; description: string }[] = [
-  { mode: 'light', name: 'Sáng', emoji: '☀️', description: 'Giao diện sáng, dễ nhìn ban ngày' },
-  { mode: 'dark', name: 'Tối', emoji: '🌙', description: 'Giao diện tối, bảo vệ mắt ban đêm' },
-  { mode: 'ocean', name: 'Đại dương', emoji: '🌊', description: 'Xanh dương mát mẻ như biển' },
-  { mode: 'sunset', name: 'Hoàng hôn', emoji: '🌅', description: 'Cam ấm áp như hoàng hôn' },
+const themeOptions: { mode: ThemeMode; name: string; icon: any; description: string }[] = [
+  { mode: 'light', name: 'Sáng', icon: 'sunny', description: 'Giao diện sáng, dễ nhìn ban ngày' },
+  { mode: 'dark', name: 'Tối', icon: 'moon', description: 'Giao diện tối, bảo vệ mắt ban đêm' },
+  { mode: 'ocean', name: 'Đại dương', icon: 'water', description: 'Xanh dương mát mẻ như biển' },
+  { mode: 'sunset', name: 'Hoàng hôn', icon: 'partly-sunny', description: 'Cam ấm áp như hoàng hôn' },
 ];
 
 export default function ThemeSelector({ visible, onClose }: ThemeSelectorProps) {
@@ -40,11 +41,14 @@ export default function ThemeSelector({ visible, onClose }: ThemeSelectorProps) 
         >
           {/* Header */}
           <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-2xl font-bold" style={{ color: colors.text.primary }}>
-              🎨 Chọn giao diện
-            </Text>
+            <View className="flex-row items-center">
+              <Ionicons name="color-palette" size={28} color={colors.text.primary} />
+              <Text className="text-2xl font-bold ml-2" style={{ color: colors.text.primary }}>
+                Chọn giao diện
+              </Text>
+            </View>
             <TouchableOpacity onPress={onClose}>
-              <Text className="text-2xl" style={{ color: colors.text.muted }}>✕</Text>
+              <Ionicons name="close" size={28} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
 
@@ -63,7 +67,13 @@ export default function ThemeSelector({ visible, onClose }: ThemeSelectorProps) 
                 }}
                 onPress={() => handleSelectTheme(option.mode)}
               >
-                <Text className="text-4xl mr-4">{option.emoji}</Text>
+                <View className="mr-4">
+                  <Ionicons 
+                    name={option.icon} 
+                    size={40} 
+                    color={mode === option.mode ? '#FFFFFF' : colors.text.primary} 
+                  />
+                </View>
                 <View className="flex-1">
                   <Text 
                     className="text-lg font-bold mb-1" 
@@ -83,7 +93,7 @@ export default function ThemeSelector({ visible, onClose }: ThemeSelectorProps) 
                   </Text>
                 </View>
                 {mode === option.mode && (
-                  <Text className="text-2xl">✓</Text>
+                  <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
                 )}
               </TouchableOpacity>
             ))}
