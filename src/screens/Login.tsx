@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -76,9 +76,13 @@ export default function Login({ navigation }: LoginProps) {
           <View className="flex-1 px-6 justify-center">
           {/* Logo/Title */}
           <View className="items-center mb-10">
-            <View className="mb-4 w-20 h-20 rounded-full items-center justify-center" 
-                  style={{ backgroundColor: colors.primary }}>
-              <Ionicons name="book" size={40} color="#FFFFFF" />
+            <View className="mb-4 w-40 h-40 rounded-3xl items-center justify-center overflow-hidden" 
+                  style={{ backgroundColor: '#FFFFFF' }}>
+              <Image 
+                source={require('../assets/images/NhanHoc_logo.jpg')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
             </View>
             <Text className="text-4xl font-bold mb-2" style={{ color: colors.primary }}>
               Nhàn Học
