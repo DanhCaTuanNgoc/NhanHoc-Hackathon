@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ExpoFileSystem from 'expo-file-system/legacy';
+import * as ExpoSharing from 'expo-sharing';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { API_BASE_URL } from '../config/api';
@@ -232,17 +234,17 @@ export default function PdfAnalysis() {
       } else {
         // Mobile: Use FileSystem to save file
         const fileName = `analyzed_${selectedFile.name}`;
-        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        const fileUri = `${ExpoFileSystem.documentDirectory}${fileName}`;
         
         // Write base64 to file
-        await FileSystem.writeAsStringAsync(fileUri, resultPdfBase64, {
-          encoding: FileSystem.EncodingType.Base64,
+        await ExpoFileSystem.writeAsStringAsync(fileUri, resultPdfBase64, {
+          encoding: 'base64',
         });
 
         // Check if sharing is available
-        const isAvailable = await Sharing.isAvailableAsync();
+        const isAvailable = await ExpoSharing.isAvailableAsync();
         if (isAvailable) {
-          await Sharing.shareAsync(fileUri, {
+          await ExpoSharing.shareAsync(fileUri, {
             mimeType: 'application/pdf',
             dialogTitle: 'Lưu hoặc chia sẻ PDF',
             UTI: 'com.adobe.pdf',

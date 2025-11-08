@@ -3,7 +3,6 @@ import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { getPersonalizedRecommendations, RecommendationsData } from '../api/recommendationsApi';
-import PdfAnalysis from '../components/PdfAnalysis';
 import { colors } from '../constants/theme';
 import { useInitializeStores } from '../hooks/useInitializeStores';
 import { getLearningDataForAnalytics } from '../services/localStorage';
@@ -796,25 +795,6 @@ export default function Recommendations() {
             ))}
           </View>
         )}
-
-        {/* Divider */}
-        <View className="px-6 pt-6">
-          <View
-            className="h-px"
-            style={{ backgroundColor: '#E2E8F0' }}
-          />
-        </View>
-
-        {/* PDF Analysis Section */}
-        <PdfAnalysis />
-
-        {/* Divider */}
-        <View className="px-6">
-          <View
-            className="h-px"
-            style={{ backgroundColor: '#E2E8F0' }}
-          />
-        </View>
 
         {/* Refresh Button */}
         <View className="px-6 pt-6 pb-8">

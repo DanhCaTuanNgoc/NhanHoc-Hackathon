@@ -6,7 +6,6 @@ import { colors } from '../constants/theme';
 import AdditionalFeatures from '../screens/AdditionalFeatures';
 import Chat from '../screens/Chat';
 import Dashboard from '../screens/Dashboard';
-import Login from '../screens/Login';
 import PdfAnalysisScreen from '../screens/PdfAnalysisScreen';
 import Quiz from '../screens/Quiz';
 import Recommendations from '../screens/Recommendations';
@@ -84,12 +83,12 @@ function TabNavigator() {
 export default function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Login"
+      initialRouteName="Main"
       screenOptions={{
         headerShown: false,
       }}
     >
-      <Stack.Screen name="Login" component={Login} />
+      {/* <Stack.Screen name="Login" component={Login} /> */}
       <Stack.Screen name="Main" component={TabNavigator} />
       <Stack.Screen name="Settings" component={Settings} />
       <Stack.Screen name="RoadmapDetail" component={RoadmapDetail} />
