@@ -54,6 +54,7 @@ export interface QuizRequest {
   topic: string;
   subtopic: string;
   description: string;
+  num_questions?: number; // Số câu hỏi trong quiz (mặc định 5)
 }
 
 export interface QuizQuestion {

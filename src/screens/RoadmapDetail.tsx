@@ -4,8 +4,9 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    Alert,
     ScrollView,
     Text,
     TouchableOpacity,
@@ -14,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
+import * as localStorage from '../services/localStorage';
 import type { RoadmapResult, SubTopic } from '../types/api';
 
 interface RoadmapDetailProps {
@@ -21,15 +23,47 @@ interface RoadmapDetailProps {
     params: {
       roadmap: RoadmapResult;
       topic: string;
+      description?: string;
+      courseId?: string; // Nếu có thì đang xem course có sẵn, không thì tạo mới
+      quizQuestionsPerLesson?: number; // Số câu hỏi mỗi bài quiz
     };
   };
   navigation: any;
 }
 
 export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps) {
-  const { roadmap, topic } = route.params;
+  const { roadmap, topic, description = '', courseId: existingCourseId, quizQuestionsPerLesson = 10 } = route.params;
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set(['tuần 1']));
   const [completedSubTopics, setCompletedSubTopics] = useState<Set<string>>(new Set());
+  const [courseId, setCourseId] = useState<string | null>(existingCourseId || null);
+  const [questionsPerQuiz, setQuestionsPerQuiz] = useState<number>(quizQuestionsPerLesson);
+
+  // Initialize course - tạo mới hoặc load từ database
+  useEffect(() => {
+    const initializeCourse = async () => {
+      try {
+        if (existingCourseId) {
+          // Load course từ database
+          const course = await localStorage.getCourseById(existingCourseId);
+          if (course) {
+            setCourseId(course.id);
+            setCompletedSubTopics(new Set(course.completedSubTopics));
+            setQuestionsPerQuiz(course.quizQuestionsPerLesson || 10);
+          }
+        } else {
+          // Tạo course mới
+          const newCourse = await localStorage.createCourse(topic, description, roadmap, quizQuestionsPerLesson);
+          setCourseId(newCourse.id);
+          console.log('✅ New course created and saved:', newCourse.id);
+        }
+      } catch (error) {
+        console.error('Error initializing course:', error);
+        Alert.alert('Lỗi', 'Không thể lưu khoá học. Vui lòng thử lại.');
+      }
+    };
+
+    initializeCourse();
+  }, []);
 
   // Convert roadmap object to array
   const weeks = Object.entries(roadmap).map(([weekKey, weekData]) => ({
@@ -51,8 +85,13 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
     });
   };
 
-  const toggleSubTopic = (weekKey: string, subTopicTitle: string) => {
+  const toggleSubTopic = async (weekKey: string, subTopicTitle: string) => {
+    if (!courseId) return;
+
     const key = `${weekKey}-${subTopicTitle}`;
+    const isCurrentlyCompleted = completedSubTopics.has(key);
+
+    // Update UI immediately
     setCompletedSubTopics((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(key)) {
@@ -62,6 +101,26 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
       }
       return newSet;
     });
+
+    // Update database
+    try {
+      if (!isCurrentlyCompleted) {
+        await localStorage.markSubTopicCompleted(courseId, weekKey, subTopicTitle);
+        console.log('✅ Subtopic marked as completed:', key);
+      }
+    } catch (error) {
+      console.error('Error updating subtopic:', error);
+      // Rollback UI on error
+      setCompletedSubTopics((prev) => {
+        const newSet = new Set(prev);
+        if (isCurrentlyCompleted) {
+          newSet.delete(key);
+        } else {
+          newSet.add(key);
+        }
+        return newSet;
+      });
+    }
   };
 
   const getWeekProgress = (weekKey: string, subTopics: SubTopic[]) => {
@@ -79,12 +138,20 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
     return Math.round((completedSubTopics.size / totalSubTopics) * 100);
   };
 
-  const handleStartQuiz = (subtopic: SubTopic, weekTitle: string) => {
+  const handleStartQuiz = (subtopic: SubTopic, weekTitle: string, weekKey: string) => {
+    if (!courseId) {
+      Alert.alert('Lỗi', 'Không tìm thấy khoá học');
+      return;
+    }
+
     navigation.navigate('Quiz', {
+      courseId,
       course: topic,
       topic: weekTitle,
+      weekKey,
       subtopic: subtopic['chủ đề con'],
       description: subtopic['mô tả'],
+      numQuestions: questionsPerQuiz,
     });
   };
 
@@ -358,7 +425,7 @@ export default function RoadmapDetail({ route, navigation }: RoadmapDetailProps)
                                 style={{
                                   backgroundColor: colors.primary + '15',
                                 }}
-                                onPress={() => handleStartQuiz(subTopic, week.title)}
+                                onPress={() => handleStartQuiz(subTopic, week.title, week.weekKey)}
                               >
                                 <Ionicons name="school" size={16} color={colors.primary} />
                                 <Text

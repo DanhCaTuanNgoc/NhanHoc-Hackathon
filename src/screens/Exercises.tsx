@@ -1,70 +1,70 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
+import type { Course } from '../services/localStorage';
+import * as localStorage from '../services/localStorage';
 
-interface Course {
-  id: string;
-  title: string;
-  progress: number;
-  totalExercises: number;
-  completedExercises: number;
-  icon: string;
-  color: string;
+interface ExercisesProps {
+  navigation: any;
 }
 
-export default function Exercises() {
+export default function Exercises({ navigation }: ExercisesProps) {
   const [selectedTab, setSelectedTab] = useState<'active' | 'completed'>('active');
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalQuizzes: 0,
+    activeCourses: 0,
+    averageScore: 0,
+  });
 
-  const activeCourses: Course[] = [
-    {
-      id: '1',
-      title: 'Lập trình Python Cơ bản',
-      progress: 65,
-      totalExercises: 20,
-      completedExercises: 13,
-      icon: 'logo-python',
-      color: colors.primary,
-    },
-    {
-      id: '2',
-      title: 'Machine Learning Nâng cao',
-      progress: 40,
-      totalExercises: 15,
-      completedExercises: 6,
-      icon: 'hardware-chip',
-      color: colors.secondary,
-    },
-    {
-      id: '3',
-      title: 'Web Development với React',
-      progress: 80,
-      totalExercises: 25,
-      completedExercises: 20,
-      icon: 'logo-react',
-      color: colors.accent,
-    },
-  ];
+  // Load courses when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadCourses();
+    }, [])
+  );
 
-  const completedCourses: Course[] = [
-    {
-      id: '4',
-      title: 'JavaScript ES6+',
-      progress: 100,
-      totalExercises: 18,
-      completedExercises: 18,
-      icon: 'logo-javascript',
-      color: colors.warning,
-    },
-  ];
+  const loadCourses = async () => {
+    try {
+      setLoading(true);
+      const allCourses = await localStorage.getAllCourses();
+      setCourses(allCourses);
 
-  const courses = selectedTab === 'active' ? activeCourses : completedCourses;
+      // Load statistics
+      const statistics = await localStorage.getStatistics();
+      setStats({
+        totalQuizzes: statistics.totalQuizzes,
+        activeCourses: statistics.activeCourses,
+        averageScore: statistics.averageScore,
+      });
+    } catch (error) {
+      console.error('Error loading courses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeCourses = courses.filter(c => c.status === 'active');
+  const completedCourses = courses.filter(c => c.status === 'completed');
+  const displayedCourses = selectedTab === 'active' ? activeCourses : completedCourses;
+
+  const handleCoursePress = (course: Course) => {
+    navigation.navigate('RoadmapDetail', {
+      roadmap: course.roadmap,
+      topic: course.topic,
+      description: course.description,
+      courseId: course.id,
+    });
+  };
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Bài tập & Kiểm tra" />
+      <AppHeader title="Các khoá học" />
       
       <ScrollView className="flex-1">
         {/* Stats Overview */}
@@ -80,7 +80,7 @@ export default function Exercises() {
             >
               <Ionicons name="trophy" size={24} color={colors.primary} />
               <Text className="text-2xl font-bold mt-2" style={{ color: colors.primary }}>
-                39
+                {stats.totalQuizzes}
               </Text>
               <Text className="text-xs" style={{ color: '#64748b' }}>
                 Bài hoàn thành
@@ -97,10 +97,10 @@ export default function Exercises() {
             >
               <Ionicons name="time" size={24} color={colors.accent} />
               <Text className="text-2xl font-bold mt-2" style={{ color: colors.accent }}>
-                15
+                {stats.activeCourses}
               </Text>
               <Text className="text-xs" style={{ color: '#64748b' }}>
-                Đang làm
+                Đang học
               </Text>
             </View>
 
@@ -114,7 +114,7 @@ export default function Exercises() {
             >
               <Ionicons name="stats-chart" size={24} color={colors.success} />
               <Text className="text-2xl font-bold mt-2" style={{ color: colors.success }}>
-                87%
+                {stats.averageScore}%
               </Text>
               <Text className="text-xs" style={{ color: '#64748b' }}>
                 Điểm TB
@@ -173,7 +173,7 @@ export default function Exercises() {
 
         {/* Course List */}
         <View className="px-6 pb-6">
-          {courses.map((course) => (
+          {displayedCourses.map((course) => (
             <TouchableOpacity
               key={course.id}
               className="mb-4 p-5 rounded-2xl"
@@ -187,6 +187,8 @@ export default function Exercises() {
                 shadowRadius: 8,
                 elevation: 2,
               }}
+              onPress={() => handleCoursePress(course)}
+              activeOpacity={0.7}
             >
               {/* Course Header */}
               <View className="flex-row items-center mb-4">
@@ -201,7 +203,7 @@ export default function Exercises() {
                     {course.title}
                   </Text>
                   <Text className="text-sm" style={{ color: '#64748b' }}>
-                    {course.completedExercises}/{course.totalExercises} bài tập
+                    {course.completedSubTopics.length}/{course.totalSubTopics} chủ đề
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
@@ -231,10 +233,11 @@ export default function Exercises() {
                 <TouchableOpacity
                   className="flex-1 py-2.5 rounded-lg flex-row items-center justify-center"
                   style={{ backgroundColor: course.color }}
+                  onPress={() => handleCoursePress(course)}
                 >
                   <MaterialCommunityIcons name="play" size={18} color="#FFFFFF" />
                   <Text className="text-sm font-semibold ml-1.5" style={{ color: '#FFFFFF' }}>
-                    Tiếp tục
+                    {course.status === 'completed' ? 'Xem lại' : 'Tiếp tục'}
                   </Text>
                 </TouchableOpacity>
 
@@ -245,6 +248,9 @@ export default function Exercises() {
                     borderWidth: 1,
                     borderColor: '#e2e8f0',
                   }}
+                  onPress={() => {
+                    // TODO: Navigate to statistics
+                  }}
                 >
                   <Ionicons name="stats-chart-outline" size={18} color="#64748b" />
                 </TouchableOpacity>
@@ -253,7 +259,7 @@ export default function Exercises() {
           ))}
 
           {/* Empty State */}
-          {courses.length === 0 && (
+          {displayedCourses.length === 0 && !loading && (
             <View className="items-center justify-center py-12">
               <View
                 className="w-20 h-20 rounded-full items-center justify-center mb-4"

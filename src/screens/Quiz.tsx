@@ -17,29 +17,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import { colors } from '../constants/theme';
 import { useQuiz } from '../hooks/useQuiz';
+import * as localStorage from '../services/localStorage';
 
-// Backend returns Vietnamese keys
+// Backend returns English keys
 interface QuizQuestionData {
-  'câu hỏi': string;
-  'các câu trả lời': string[];
-  'đáp án đúng': number;
-  'giải thích': string;
+  question: string;
+  options: string[];
+  answerIndex: string | number; // Backend returns string, we need number
+  reason: string;
 }
 
 interface QuizScreenProps {
   route: {
     params: {
+      courseId: string;
       course: string;
       topic: string;
+      weekKey: string;
       subtopic: string;
       description: string;
+      numQuestions?: number; // Số câu hỏi trong quiz
     };
   };
   navigation: any;
 }
 
 export default function Quiz({ route, navigation }: QuizScreenProps) {
-  const { course, topic, subtopic, description } = route.params;
+  const { courseId, course, topic, weekKey, subtopic, description, numQuestions = 10 } = route.params;
   const { createAndWait } = useQuiz();
 
   const [questions, setQuestions] = useState<QuizQuestionData[]>([]);
@@ -61,17 +65,22 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
         topic,
         subtopic,
         description,
+        num_questions: numQuestions,
       });
 
-      console.log('Quiz API result:', JSON.stringify(result, null, 2));
-
       if (result?.status === 'completed' && result.result?.questions) {
-        const quizQuestions = result.result.questions;
-        console.log('Quiz questions count:', quizQuestions.length);
-        console.log('First question:', JSON.stringify(quizQuestions[0], null, 2));
+        const rawQuestions = result.result.questions;
         
-        setQuestions(quizQuestions as any);
-        setSelectedAnswers(new Array(quizQuestions.length).fill(null));
+        // Normalize data: convert answerIndex from string to number
+        const normalizedQuestions: QuizQuestionData[] = rawQuestions.map((q: any) => ({
+          question: q.question,
+          options: q.options,
+          answerIndex: typeof q.answerIndex === 'string' ? parseInt(q.answerIndex) : q.answerIndex,
+          reason: q.reason,
+        }));
+        
+        setQuestions(normalizedQuestions);
+        setSelectedAnswers(new Array(normalizedQuestions.length).fill(null));
       } else {
         console.error('Quiz generation failed:', result);
         Alert.alert('Lỗi', 'Không thể tạo quiz. Vui lòng thử lại.', [
@@ -108,7 +117,7 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const unanswered = selectedAnswers.filter((a) => a === null).length;
 
     if (unanswered > 0) {
@@ -117,18 +126,48 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
         `Bạn còn ${unanswered} câu chưa trả lời. Bạn có muốn nộp bài không?`,
         [
           { text: 'Hủy', style: 'cancel' },
-          { text: 'Nộp bài', onPress: () => setShowResults(true) },
+          { text: 'Nộp bài', onPress: () => saveAndShowResults() },
         ]
       );
     } else {
+      await saveAndShowResults();
+    }
+  };
+
+  const saveAndShowResults = async () => {
+    try {
+      // Lưu kết quả quiz vào database
+      const quizQuestions = questions.map(q => ({
+        question: q.question,
+        options: q.options,
+        answerIndex: typeof q.answerIndex === 'number' ? q.answerIndex : parseInt(q.answerIndex as string),
+        reason: q.reason,
+      }));
+
+      await localStorage.saveQuizResult(
+        courseId,
+        course,
+        topic,
+        subtopic,
+        quizQuestions,
+        selectedAnswers
+      );
+
+      // Mark subtopic as completed
+      await localStorage.markSubTopicCompleted(courseId, weekKey, subtopic);
+
       setShowResults(true);
+      console.log('✅ Quiz result saved successfully');
+    } catch (error) {
+      console.error('Error saving quiz result:', error);
+      Alert.alert('Lỗi', 'Không thể lưu kết quả. Vui lòng thử lại.');
     }
   };
 
   const calculateScore = () => {
     let correct = 0;
     questions.forEach((q, index) => {
-      if (selectedAnswers[index] === q['đáp án đúng']) {
+      if (selectedAnswers[index] === q.answerIndex) {
         correct++;
       }
     });
@@ -233,7 +272,7 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
 
             {questions.map((question, qIndex) => {
               const userAnswer = selectedAnswers[qIndex];
-              const correctAnswer = question['đáp án đúng'];
+              const correctAnswer = question.answerIndex;
               const isCorrect = userAnswer === correctAnswer;
 
               return (
@@ -259,7 +298,7 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
                       </Text>
                     </View>
                     <Text className="text-sm font-bold flex-1" style={{ color: '#FFFFFF' }}>
-                      {question['câu hỏi']}
+                      {question.question}
                     </Text>
                     <Ionicons
                       name={isCorrect ? 'checkmark-circle' : 'close-circle'}
@@ -270,7 +309,7 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
 
                   {/* Answers */}
                   <View className="p-4">
-                    {question['các câu trả lời'].map((answer, aIndex) => {
+                    {question.options.map((answer: string, aIndex: number) => {
                       const isUserAnswer = userAnswer === aIndex;
                       const isCorrectAnswer = correctAnswer === aIndex;
 
@@ -334,7 +373,7 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
                         </Text>
                       </View>
                       <Text className="text-sm leading-5" style={{ color: '#78350F' }}>
-                        {question['giải thích']}
+                        {question.reason}
                       </Text>
                     </View>
                   </View>
@@ -375,7 +414,7 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   // Safety check: if no current question, show error
-  if (!currentQuestion || !currentQuestion['các câu trả lời']) {
+  if (!currentQuestion || !currentQuestion.options) {
     return (
       <SafeAreaView className="flex-1" style={{ backgroundColor: '#F8FAFC' }}>
         <AppHeader title="Quiz" />
@@ -443,14 +482,14 @@ export default function Quiz({ route, navigation }: QuizScreenProps) {
               </Text>
             </View>
             <Text className="text-base font-bold flex-1 leading-6" style={{ color: '#FFFFFF' }}>
-              {currentQuestion['câu hỏi']}
+              {currentQuestion.question}
             </Text>
           </View>
         </View>
 
         {/* Answer Options */}
         <View className="mb-6">
-          {currentQuestion['các câu trả lời'].map((answer, index) => {
+          {currentQuestion.options.map((answer: string, index: number) => {
             const isSelected = userAnswer === index;
 
             return (

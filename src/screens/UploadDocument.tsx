@@ -82,6 +82,8 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
         navigation.navigate('RoadmapDetail', {
           roadmap: result.result,
           topic: topic.trim(),
+          description: description.trim(),
+          quizQuestionsPerLesson: options.quizPerLesson,
         });
         
         // Reset form
@@ -109,10 +111,10 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Tạo Lộ Trình Học Tập" />
+      <AppHeader title="Tạo khoá học với AI" />
       <ScrollView className="flex-1 px-6 pt-6">
         {/* Page Description */}
-        <View className="mb-6">
+        {/* <View className="mb-6">
           <View className="flex-row items-center mb-2">
             <Ionicons name="bulb" size={28} color={colors.primary} />
             <Text className="text-2xl font-bold ml-2" style={{ color: '#0f172a' }}>
@@ -122,7 +124,7 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
           <Text className="text-base leading-6" style={{ color: '#64748b' }}>
             Nhập chủ đề bạn muốn học và AI sẽ tự động tạo lộ trình học tập hoàn chỉnh với bài giảng và bài kiểm tra.
           </Text>
-        </View>
+        </View> */}
 
         {/* Input Form */}
         <View
@@ -147,18 +149,26 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
               </Text>
             </View>
             <TextInput
-              className="px-4 py-3 rounded-xl text-base"
               style={{
                 backgroundColor: '#F8FAFC',
                 borderWidth: 1,
                 borderColor: topic ? colors.primary : '#e2e8f0',
                 color: '#0f172a',
+                paddingHorizontal: 16,
+                paddingTop: 12,
+                paddingBottom: 12,
+                borderRadius: 12,
+                fontSize: 16,
+                height: 48,
+                includeFontPadding: false,
+                textAlignVertical: 'center',
               }}
               placeholder="VD: Lập trình Python cơ bản"
               placeholderTextColor="#94a3b8"
               value={topic}
               onChangeText={setTopic}
               autoCapitalize="sentences"
+              numberOfLines={1}
             />
           </View>
 
@@ -197,34 +207,6 @@ export default function UploadDocument({ navigation }: UploadDocumentProps) {
               <Text className="text-base font-bold ml-2" style={{ color: '#0f172a' }}>
                 Tùy chọn lộ trình
               </Text>
-            </View>
-
-            {/* Audience Level */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold mb-2" style={{ color: '#64748b' }}>
-                Trình độ
-              </Text>
-              <View className="flex-row gap-2">
-                {(['beginner', 'intermediate', 'advanced'] as const).map((level) => (
-                  <TouchableOpacity
-                    key={level}
-                    className="flex-1 py-3 rounded-xl items-center"
-                    style={{
-                      backgroundColor: options.audienceLevel === level ? colors.primary : '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: options.audienceLevel === level ? colors.primary : '#e2e8f0',
-                    }}
-                    onPress={() => setOptions({ ...options, audienceLevel: level })}
-                  >
-                    <Text
-                      className="text-sm font-semibold"
-                      style={{ color: options.audienceLevel === level ? '#FFFFFF' : '#64748b' }}
-                    >
-                      {level === 'beginner' ? 'Cơ bản' : level === 'intermediate' ? 'Trung bình' : 'Nâng cao'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </View>
 
             {/* Lesson Count */}
