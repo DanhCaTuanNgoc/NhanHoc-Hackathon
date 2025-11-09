@@ -120,7 +120,7 @@ export default function Dashboard({ navigation }: DashboardProps) {
           }}
         >
           {/* Top Icons */}
-          <View className="flex-row justify-between items-center mb-6">
+          <View className="flex-row justify-center items-center mb-6">
             <Text 
               className="text-4xl font-bold" 
               style={{ 
@@ -131,21 +131,11 @@ export default function Dashboard({ navigation }: DashboardProps) {
                 textShadowOffset: { width: 2, height: 2 },
                 textShadowRadius: 4,
                 fontWeight: '900',
+                textAlign: 'center'
               }}
             >
               Nhàn Học
             </Text>
-            <View className="flex-row gap-4">
-              <TouchableOpacity onPress={() => navigation.navigate('UploadDocument')}>
-                <Ionicons name="send" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Ionicons name="notifications" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-                <Ionicons name="person-circle" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Quick Action Card */}
@@ -280,7 +270,7 @@ export default function Dashboard({ navigation }: DashboardProps) {
                 icon={<Ionicons name="book" size={28} color={colors.primary} />}
                 label="Khóa học"
                 backgroundColor="#E0F2FE"
-                onPress={() => navigation.navigate('Exercises')}
+                onPress={() => navigation.navigate('UploadDocument')}
               />
               <ActionButton
                 icon={<Ionicons name="stats-chart" size={28} color={colors.accent} />}
@@ -299,23 +289,22 @@ export default function Dashboard({ navigation }: DashboardProps) {
             {/* Row 2 */}
             <View className="flex-row">
               <ActionButton
-                icon={<Ionicons name="school" size={28} color={colors.primary} />}
-                label="Học tập"
+                icon={<Ionicons name="bulb" size={28} color={colors.primary} />}
+                label="Gợi ý"
                 backgroundColor="#E0F2FE"
-                onPress={() => navigation.navigate('Exercises')}
+                onPress={() => navigation.navigate('Recommendations')}
               />
               <ActionButton
-                icon={<Ionicons name="trophy" size={28} color={colors.accent} />}
-                label="Thành tích"
-                badge={quizResults.length > 0}
+                icon={<Ionicons name="document-attach" size={28} color={colors.accent} />}
+                label="PDF"
                 backgroundColor="#CFFAFE"
-                onPress={() => navigation.navigate('Statistics')}
+                onPress={() => navigation.navigate('PdfAnalysis')}
               />
               <ActionButton
-                icon={<Ionicons name="chatbubble-ellipses-outline" size={28} color={colors.secondary} />}
+                icon={<Ionicons name="chatbubble-ellipses" size={28} color={colors.secondary} />}
                 label="Chatbot"
                 backgroundColor="#DBEAFE"
-                onPress={() => navigation.navigate('Profile')}
+                onPress={() => navigation.navigate('Chat')}
               />
             </View>
           </View>

@@ -161,7 +161,7 @@ export default function Statistics() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFFFFF' }}>
-      <AppHeader title="Thống kê" />
+      <AppHeader title="Thống kê bằng AI" />
       
       <ScrollView className="flex-1">
         {/* Period Selector */}

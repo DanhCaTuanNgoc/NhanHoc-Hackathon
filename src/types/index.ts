@@ -88,4 +88,8 @@ export type DrawerParamList = {
   Statistics: undefined;
   Settings: undefined;
   Profile: undefined;
+  Chat: undefined;
+  Recommendations: undefined;
+  PdfAnalysis: undefined;
+  AdditionalFeatures: undefined;
 };
